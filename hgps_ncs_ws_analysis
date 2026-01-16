@@ -1,0 +1,2170 @@
+devtools::install_github("danbelsky/DunedinPoAm38")
+devtools::install_github("danbelsky/DunedinPACE")
+devtools::install_github("HigginsChenLab/methylCIPHER")
+devtools::install_github("karoliskoncevicius/annmatrix@dev")
+
+library(remotes)
+install_github("karoliskoncevicius/matrixTests@dev_lm", force = TRUE)
+
+# necituoti
+devtools::install_local("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/epiclocks_0.1.3/epiclocks/")
+library(epiclocks)
+
+install.packages("annmatrix")
+library(annmatrix)
+
+library(methylCIPHER)
+
+library(ggplot2)
+
+library(data.table)
+
+install.packages("VennDiagram")
+library(VennDiagram)
+library(basetheme)
+library(matrixTests)
+install.packages("ggpubr")
+library(ggpubr)
+library(dplyr)
+library(broom)
+library(scales)
+library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+
+
+#calcPhenoAge(exampleBetas, examplePheno, imputation = F)
+
+#calcPhenoAge(exampleBetas, imputation = F)
+
+#calcSystemsAge(exampleBetas, examplePheno)
+
+#head(t(exampleBetas))
+#View(exampleBetas)
+#View(examplePheno)
+
+RData <- get_methylCIPHER_path()
+
+# 61 CpGs
+cpg_list <- read.table("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/acel13555-sup-0001-tables1.csv",
+                       quote = "",
+                       row.names = NULL,
+                       sep = ",")[,2][-1]
+
+# HGPS
+
+data_progeria <- data_progeria_classic
+
+data_progeria <- readRDS("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/GSE182991_annmatrix.rds")
+
+data_progeria_classic <- data_progeria_classic[, data_progeria_classic$diagnosis != "non-classical progeroid laminopathies"]
+
+data_progeria$diagnosis[data_progeria$diagnosis!="control"] <- "HGPS"
+data_progeria$diagnosis[data_progeria$diagnosis=="control"] <- "control HGPS"
+
+
+data_progeria <- data_progeria[, data_progeria$age < 39]
+
+progeriaPheno <- data.frame(Sample_ID = data_progeria$id,
+                            gender = data_progeria$sex,
+                            Age = data_progeria$age,
+                            group = data_progeria$diagnosis,
+                            Female = data_progeria$sex)
+
+progeriaPheno$group <- ifelse(progeriaPheno$group == "control", 0, 1)
+progeriaPheno$Female <- ifelse(progeriaPheno$Female == "M", 0, 1)
+
+telomereClocks <- ("calcDNAmTL")
+userClocks <- c("calcAdaptAge", "calcBocklandt", "calcDunedinPoAm38", "calcHannum", "calcHorvath2",
+                "calcLeeRobust", "calcWeidner", "calcZhang2019", "calcEpiTOC", "calcGaragnani",
+                "calcHorvath1", "calcHRSInChPhenoAge","calcLeeRefinedRobust", "calcLin", "calcPhenoAge",
+                "calcVidalBralo", "calcZhang", "calcCausAge", "calcDamAge", "calcEpiTOC2", "calcDNAmTL")
+
+clock_list <- c("Sample_ID", "gender", "Age", "group", "data_pckg", "DamAge", "AdaptAge", "CausAge", "PhenoAge",
+                "DunedinPoAm38", "Hannum", "Horvath1", "Horvath2", "Zhang",
+                "Zhang2019", "EpiTOC", "DNAmTL", "Age_prediction", "PCHorvath1", "PCHorvath2",
+                "PCHannum", "PCPhenoAge", "PCDNAmTL", "PCGrimAge", "intrinClock", "clockCage")
+
+progeria_clocks <- calcUserClocks(userClocks, t(data_progeria), progeriaPheno, imputation = F)
+
+progeria_pcclocks <- calcPCClocks(t(as.matrix(data_progeria)), progeriaPheno)
+progeria_clocks <- merge(progeria_clocks, progeria_pcclocks)
+
+
+progeria_intrin <- data.frame(intrinClock = clock_intrinclock(data_progeria))
+progeria_intrin$Sample_ID <- rownames(progeria_intrin)
+progeria_clocks <- merge(progeria_clocks, progeria_intrin)
+
+
+progeria_cage <- data.frame(clockCage = clock_cage(data_progeria))
+progeria_cage$Sample_ID <- rownames(progeria_cage)
+progeria_clocks <- merge(progeria_clocks, progeria_cage)
+
+
+progeria_systemsAge <- calcSystemsAge(t(data_progeria), progeriaPheno)
+systemsAge_cols <- c("Sample_ID", "gender", "Age", "group", "Female", "SystemsAge", "Age_prediction", "Blood")
+progeria_systemsAge <- progeria_systemsAge[,systemsAge_cols]
+progeria_clocks <- merge(progeria_clocks, progeria_systemsAge)
+
+progeria_clocks$data_pckg <- "progeria"
+
+progeria_retro <- calcRetroClock450k(t(data_progeria), progeriaPheno)
+progeria_clocks <- merge(progeria_clocks, progeria_retro)
+
+
+# NCS
+
+data_ncs <- readRDS("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/GSE64495_annmatrix.rds")
+
+data_ncs_classic <- data_ncs_classic[, data_ncs_classic$diagnosis %in% c("control", "syndrome x")]
+data_ncs <- data_ncs[, data_ncs$diagnosis != "down syndrome and possibly syndrome x"]
+
+data_ncs$diagnosis[data_ncs$diagnosis!="control"] <- "ncs"
+data_ncs$diagnosis[data_ncs$diagnosis=="control"] <- "control NCS"
+
+data_ncs <- data_ncs[, data_ncs$age < 30]
+
+ncsPheno <- data.frame(Sample_ID = data_ncs$id,
+                       gender = data_ncs$sex,
+                       Age = data_ncs$age,
+                       group = data_ncs$diagnosis,
+                       Female = data_ncs$sex)
+
+ncsPheno$group <- ifelse(ncsPheno$group == "control", 0, 1)
+ncsPheno$Female <- ifelse(ncsPheno$Female == "M", 0, 1)
+
+ncs_clocks <- calcUserClocks(userClocks, t(data_ncs), ncsPheno, imputation = F)
+
+ncs_pcclocks <- calcPCClocks(t(as.matrix(data_ncs)), ncsPheno)
+ncs_clocks <- merge(ncs_clocks, ncs_pcclocks)
+
+ncs_intrin <- data.frame(intrinClock = clock_intrinclock(data_ncs))
+ncs_intrin$Sample_ID <- rownames(ncs_intrin)
+ncs_clocks <- merge(ncs_clocks, ncs_intrin)
+
+ncs_cage <- data.frame(clockCage = clock_cage(data_ncs))
+ncs_cage$Sample_ID <- rownames(ncs_cage)
+ncs_clocks <- merge(ncs_clocks, ncs_cage)
+
+
+ncs_systemsAge <- calcSystemsAge(t(data_ncs), ncsPheno)
+ncs_systemsAge <- ncs_systemsAge[,systemsAge_cols]
+ncs_clocks <- merge(ncs_clocks, ncs_systemsAge)
+
+ncs_clocks$data_pckg <- "ncs"
+
+ncs_retro <- calcRetroClock450k(t(data_ncs), ncsPheno)
+ncs_clocks <- merge(ncs_clocks, ncs_retro)
+
+
+# WS
+
+data_werner <- readRDS("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/GSE131752_annmatrix.rds")
+
+data_werner <- data_werner[, data_werner$diagnosis %in% c("control", "classical werner syndrome")]
+
+data_werner$diagnosis[data_werner$diagnosis!="control"] <- "werner"
+data_werner$diagnosis[data_werner$diagnosis=="control"] <- "control Werner"
+
+wsPheno <- data.frame(Sample_ID = data_werner$id,
+                      gender = data_werner$sex,
+                      Age = data_werner$age,
+                      group = data_werner$diagnosis,
+                      Female = data_werner$sex)
+
+wsPheno$group <- ifelse(wsPheno$group == "control", 0, 1)
+wsPheno$Female <- ifelse(wsPheno$Female == "M", 0, 1)
+
+ws_clocks <- calcUserClocks(userClocks, t(data_werner), wsPheno, imputation = F)
+
+
+ws_pcclocks <- calcPCClocks(t(as.matrix(data_werner)), wsPheno)
+ws_clocks <- merge(ws_clocks, ws_pcclocks)
+
+ws_intrin <- data.frame(intrinClock = clock_intrinclock(data_werner))
+ws_intrin$Sample_ID <- rownames(ws_intrin)
+ws_clocks <- merge(ws_clocks, ws_intrin)
+
+ws_cage <- data.frame(clockCage = clock_cage(data_werner)) #missing cytosines
+ws_cage$Sample_ID <- rownames(ws_cage)
+ws_clocks <- merge(ws_clocks, ws_cage)
+
+ws_systemsAge <- calcSystemsAge(t(as.matrix(data_werner)), wsPheno)
+ws_systemsAge <- ws_systemsAge[,systemsAge_cols]
+ws_clocks <- merge(ws_clocks, ws_systemsAge)
+
+ws_clocks$data_pckg <- "werner"
+
+
+# save the data
+saveRDS(progeria_clocks, file = "progeria_clocks.rds")
+saveRDS(ncs_clocks, file = "ncs_clocks.rds")
+saveRDS(ws_clocks, file = "ws_clocks.rds")
+
+# bind all
+
+clocks_data <- rbind(rbind(progeria_clocks[,1:46], ncs_clocks[,1:46]), ws_clocks)
+
+clocks_data$group <- ifelse(clocks_data$group == 0, "control", "disease")
+
+clocks_data$data_pckg[clocks_data$data_pckg=="ncs"] <- "NCS"
+clocks_data$data_pckg[clocks_data$data_pckg=="progeria"] <- "HGPS"
+clocks_data$data_pckg[clocks_data$data_pckg=="werner"] <- "Werner"
+
+clocks_data <- clocks_data %>%
+  select(all_of(clock_list)) %>%
+  rename(Horvath = Horvath1) %>%
+  rename(SkinAndBlood = Horvath2) %>%
+  rename(PCHorvath = PCHorvath1) %>%
+  rename(PCSkinAndBlood = PCHorvath2) %>%
+  rename(SystemsAge = Age_prediction) %>%
+  rename(C_age = clockCage)
+
+
+saveRDS(clocks_data, file = "clocks_data.rds")
+
+clock_names <- colnames(clocks_data)[6:26]
+
+
+
+# graph - y clock, x age
+'
+plot_clock <- function(df, clock_name) {
+
+  df$clock_name <- df[[clock_name]]
+  
+  df <- df %>%
+    group_by(data_pckg) %>%
+    mutate(residuals = residuals(lm(clock_name ~ Age))) %>%
+    ungroup()
+
+  p <- ggboxplot(df,
+                 x = "group",
+                 y = "residuals",
+                 color = "group",
+                 palette = "jco",
+                 facet.by = "data_pckg",
+                 add = "jitter",
+                 add.params = list(
+                   width = 0.2,
+                   alpha = 0.6,
+                   size = 1.5
+                 )) +
+                
+    stat_compare_means(method = "t.test") +
+    labs(title = paste0(clock_name),
+         x = "Group", y = "Residuals")
+  
+  return(p)
+}
+
+lapply(clock_names, function(clock) {
+  
+  p <- plot_clock(clocks_data, clock)
+  
+  ggsave(
+    filename = paste0("clock_residuals_boxplot_", clock, ".png"),
+    plot = p,
+    width = 10,
+    height = 6,
+    dpi = 300
+  )
+})
+'
+
+sig_clocks_pos <- data.frame(Clock_names = character(0),
+                         Disease = character(0),
+                         pvals = numeric(0),
+                         Median = numeric(0),
+                         stringsAsFactors = FALSE)
+
+sig_clocks_neg <- data.frame(Clock_names = character(0),
+                             Disease = character(0),
+                             pvals = numeric(0),
+                             Median = numeric(0),
+                             stringsAsFactors = FALSE)
+
+sig_clocks <- data.frame(Clock_names = character(0),
+                         Disease = character(0),
+                         pvals = numeric(0),
+                         Median = numeric(0),
+                         MedianDiff = numeric(0),
+                         stringsAsFactors = FALSE)
+
+
+plot_clock_violin <- function(df, clock_name) {
+  
+  df$clock_name <- df[[clock_name]]
+  
+  #if (clock_name %in% telomere_clocks) {
+    # compute residuals
+    df <- df %>%
+      group_by(data_pckg) %>%
+      mutate(residuals = residuals(lm(clock_name ~ Age))) %>%
+      ungroup()
+  #} else {
+  #  df <- df %>%
+  #    group_by(data_pckg) %>%
+  #    mutate(residuals = clock_name - Age) %>%
+  #    ungroup()
+  #}
+  
+  
+  pkgs <- unique(df$data_pckg)
+  
+  # 1. compute global y-limits across all data
+  lim <- diff(range(df$residuals)) * 0.8
+  global_ylim <- range(df$residuals) + c(0-lim, lim)
+  
+  par(mfrow = c(1, length(pkgs)), mar = c(4, 2, 3, 1))  # smaller left margin
+  par(oma = c(4, 4, 0, 0))  # outer margins for common y-axis
+  
+  for (pkg in pkgs) {
+    
+    sub <- df[df$data_pckg == pkg, ]
+    
+    dens <- tapply(sub$residuals, sub$group, density)
+    
+    cols <- hcl.colors(length(dens), "Zissou")
+    
+    xs <- Map(getElement, dens, "y")
+    ys <- Map(getElement, dens, "x")
+    
+    # mirror densities
+    xs <- Map(c, xs, Map(rev, Map(`*`, -1, xs)))
+    ys <- Map(c, ys, Map(rev, ys))
+    
+    # scale & position violins
+    xs <- Map(function(x) (x - min(x)) / max(x - min(x)) * 0.4, xs)
+    xs <- Map(`+`, xs, 1:length(xs))
+    
+    plot.new()
+    plot.window(
+      xlim = c(0.5, length(xs) + 0.5),
+      ylim = global_ylim  # use global y-limits!
+    )
+    
+    par(xpd = FALSE)  # ensure drawing is clipped to subplot
+    grid(nx = NA, ny = NULL, lwd = 1.5)
+    
+    Map(polygon, xs, ys, col = cols)
+    
+    axis(2, las = 1)
+    
+    title(pkg, font = 2, line = 0)
+    
+    medians <- tapply(sub$residuals, sub$group, median)
+    x_centers <- sapply(xs, function(x) mean(range(x)))
+    segments(
+      x0 = x_centers - 0.2,
+      x1 = x_centers + 0.2,
+      y0 = medians,
+      y1 = medians,
+      lwd = 1,
+      col = "black"
+    )
+    
+    groups <- unique(sub$group)
+    if (length(groups) == 2) {
+      p_val <- t.test(residuals ~ group, data = sub)$p.value
+    } else {
+      p_val <- summary(aov(residuals ~ group, data = sub))[[1]][["Pr(>F)"]][1]
+    }
+    
+'
+    if (p_val <= 0.05) {
+      if (medians[["disease"]] > medians[["control"]]){
+          sig_clocks_pos <<- rbind(sig_clocks_pos, data.frame(Clock_names = clock_name,
+                                                          Disease = pkg,
+                                                          Median = medians[["disease"]],
+                                                          MedianDiff = medians[["disease"]] - medians[["control"]],
+                                                          pvals = p_val,
+                                                          stringsAsFactors = FALSE)
+                                   )
+        } else{
+          sig_clocks_neg <<- rbind(sig_clocks_neg, data.frame(Clock_names = clock_name,
+                                                          Disease = pkg,
+                                                          Median = medians[["disease"]],
+                                                          MedianDiff = medians[["disease"]] - medians[["control"]],
+                                                          pvals = p_val,
+                                                          stringsAsFactors = FALSE)
+                                   )
+        }
+    }
+'
+    
+    #if (p_val <= 0.05) {
+    sig_clocks <<- rbind(sig_clocks, data.frame(Clock_names = clock_name,
+                                                Disease = pkg,
+                                                Median = medians[["disease"]],
+                                                MedianDiff = medians[["disease"]] - medians[["control"]],
+                                                pvals = p_val,
+                                                stringsAsFactors = FALSE)
+        )
+    #}
+
+    y_pos <- max(sub$residuals, na.rm = TRUE) + 0.1 * diff(global_ylim)
+    text(x = 1.8, 
+         y = y_pos,
+         labels = paste0("p = ", signif(p_val, 3)),
+         cex = 2)
+    
+    mtext(paste(clock_name, "age acceleration"), side = 2, outer = TRUE,
+          line = 1, las = 0, font = 1.3)
+  }
+  par(xpd = NA)
+  
+  llim <- diff(range(df$residuals)) * 0.2
+  
+  legend(x = -1, y = global_ylim[1] - llim,
+         legend = names(dens), fill = cols,
+         ncol = length(cols),
+         bty = "n", cex = 2,
+         inset = 0,
+         xjust = 0.5, yjust = 0.5) 
+  
+}
+
+
+plot_clock_violin(clocks_data, "AdaptAge")
+
+lapply(clock_names, function(clock) {
+  
+  png(filename = paste0("clock_residuals_violin_lm_", clock, ".png"),
+      width = 10, height = 6, units = "in", res = 300)
+  
+  plot_clock_violin(clocks_data, clock)
+  
+  dev.off()  # close the file
+})
+
+n <- nrow(ncs_clocks)
+i <- nrow(progeria_clocks)
+j <- nrow(ws_clocks)
+
+color_map <- c(
+  "NCS control"      = "lightpink",
+  "NCS disease"       = "magenta4",
+  "Werner control"   = "darksalmon",
+  "Werner disease"    = "darkred",
+  "HGPS control" = "lightsteelblue3",
+  "HGPS disease"  = "royalblue4"
+)
+
+'''
+get_stats <- function(df, clock_name) {
+  
+  df %>%
+    mutate(clock_name = .data[[clock_name]]) %>%
+    group_by(disease_group) %>%
+    do({
+      fit <- lm(clock_name ~ Age, data = .)
+      tibble(
+        p_value = tidy(fit) %>% filter(term == "Age") %>% pull(p.value),
+        r2 = glance(fit)$r.squared
+      )
+    }) %>%
+    mutate(
+      label = paste0(
+        "R² = ", round(r2, 2),
+        "\n",
+        "p = ", signif(p_value, 3)
+      )
+    )
+}
+
+plot_scatter <- function(df, clock_name) {
+  
+  df$clock_name <- df[[clock_name]]
+  
+  df$disease_group <- interaction(df$data_pckg, df$group, sep = " ")
+  
+  stats <- get_stats(df, clock_name)
+  
+  ggplot(df, aes(x = Age, y = clock_name, color = disease_group)) +
+    geom_point(alpha = 0.7) +
+    geom_smooth(method = "lm", se = FALSE) +
+    geom_text(
+  data = stats,
+  aes(
+    x = Inf,
+    y = Inf,
+    label = label,
+    color = disease_group
+  ),
+  hjust = 1.1,
+  vjust = seq(1.2, by = 1.2, length.out = nrow(stats)),
+  show.legend = FALSE
+) +
+    scale_color_manual(values = color_map) +
+    labs(
+      title = paste(clock_name, "- Clock trajectory across all datasets"),
+      x = "Age",
+      y = clock_name,
+      color = "Disease_Group"
+    ) +
+    theme_bw() +
+    theme(
+      legend.position = "right",
+      legend.title = element_text(size = 10),
+      legend.text  = element_text(size = 8)
+    )
+}
+
+plot_scatter(clocks_data, "clockCage")
+
+lapply(clock_names, function(clock) {
+  
+  p <- plot_scatter(clocks_data, clock)
+  
+  ggsave(
+    filename = paste0("clocks_regression_", clock, ".png"),
+    plot = p,
+    width = 10,
+    height = 6,
+    dpi = 300
+  )
+})
+'''
+dev.off()
+png(
+  filename = "age_acceleration_lm_dotchart.png",
+  width = 10, height = 6, units = "in", res = 300
+)
+
+pdf("age_acceleration_lm_dotchart.pdf", width = 15/2.54, height = 15/2.54, pointsize = 8)
+
+
+
+sig_thresh <- 0.05
+
+sig_df  <- sig_clocks[sig_clocks$pval <= sig_thresh, ]
+nonsig_df <- sig_clocks[sig_clocks$pval > sig_thresh, ]
+
+# Disease colors
+disease_cols <- c(
+  NCS    = "#60BD68",
+  HGPS   = "steelblue3",
+  Werner = "slateblue3"
+)
+
+# Clock order
+clocks <- unique(sig_clocks$Clock_names)
+ys <- seq_along(clocks)
+names(ys) <- clocks
+
+# X limits
+xlim <- range(sig_clocks$MedianDiff, na.rm = TRUE)
+x_pad <- diff(xlim) * 0.1
+xlim <- c(xlim[1] - x_pad, xlim[2] + x_pad)
+
+sig_clocks_all <- sig_clocks
+#sig_clocks <- sig_clocks[sig_clocks$Clock_names != "epiTOC2", ]
+
+# Set up plot
+plot.new()
+plot.window(
+  xlim = xlim,
+  ylim = c(min(ys) - 0.2, max(ys) + 0.2)
+)
+
+abline(v = 0, col = "grey", lty = 2)
+
+# Horizontal grid lines
+for (y in ys) {
+  segments(
+    x0 = xlim[1],
+    x1 = xlim[2],
+    y0 = y,
+    y1 = y,
+    col = "grey",
+    lty = "dotted",
+    lwd = 1
+  )
+}
+'
+# --- Non-significant points (EMPTY) ---
+for (i in seq_len(nrow(nonsig_df))) {
+  row <- nonsig_df[i, ]
+  
+  points(
+    x = row$MedianDiff,
+    y = ys[as.character(row$Clock_names)] +
+      runif(1, -0.15, 0.15),
+    col = disease_cols[row$Disease],
+    pch = 1,     # open circle
+    cex = 1.8
+  )
+}
+'
+# --- Significant points (FILLED) ---
+for (i in seq_len(nrow(sig_df))) {
+  row <- sig_df[i, ]
+  
+  points(
+    x = row$MedianDiff,
+    y = ys[as.character(row$Clock_names)] +
+      runif(1, -0.15, 0.15),
+    col = disease_cols[row$Disease],
+    pch = 19,    # filled circle
+    cex = 2
+  )
+}
+
+# Axes
+ticks <- seq(-5, 320, by = 5)
+axis(1, at = ticks, cex.axis = 0.7)
+axis(2, at = ys, labels = clocks, las = 2, cex.axis = 0.45)
+
+title(
+  main = "Age acceleration per clock",
+  xlab = "Age acceleration",
+  ylab = "",
+  cex.main = 0.9,
+  cex.lab  = 0.8
+)
+
+# Legend
+par(xpd = TRUE)
+
+legend(
+  "topright",
+  legend = c("NCS", "HGPS", "Werner"),
+  col = disease_cols[c("NCS", "HGPS", "Werner")],
+  pch = 19,
+  cex = 0.7,
+  bty = "n",
+)
+'
+legend(
+  "bottomright",
+  legend = c("Significant", "Not significant"),
+  pch = c(19, 1),
+  cex = 0.7,
+  bty = "n"
+)
+'
+par(xpd = FALSE)
+
+dev.off()
+
+
+
+
+# searching for DMCs
+
+# remove SNPs
+
+info_snps_EPIC <- read.table("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/SNPs/EPIC.hg38.mask.tsv",
+                   quote = "",
+                   row.names = NULL,
+                   header = TRUE,
+                   sep = "\t")
+
+snps_EPIC <- info_snps_EPIC$probeID[info_snps_EPIC$MASK_general == "TRUE"]
+
+data_progeria_noSNP <- data_progeria[!rownames(data_progeria) %in% snps_EPIC, ]
+
+data_progeria_noSNP_filtered <- data_progeria_noSNP[, data_progeria_noSNP$age < 39]
+
+
+data_werner_noSNP <- data_werner[!rownames(data_werner) %in% snps_EPIC, ]
+
+info_snps_HM450 <- read.table("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/SNPs/HM450.hg38.mask.tsv",
+                         quote = "",
+                         row.names = NULL,
+                         header = TRUE,
+                         sep = "\t")
+
+snps_HM450 <- info_snps_HM450$probeID[info_snps_HM450$MASK_general == "TRUE"]
+
+data_ncs_noSNP <- data_ncs[!rownames(data_ncs) %in% snps_HM450, ]
+
+
+
+# JACK KNIFE FOR NCS DATA
+cgs <- rownames(data_ncs_jacked_noSNP_all)
+
+samples <- colnames(data_ncs_jacked_noSNP[,data_ncs_jacked_noSNP$diagnosis == "ncs"])
+
+mod0 <- model.matrix(~ data_ncs_jacked_noSNP$age)
+mod1 <- model.matrix(~ data_ncs_jacked_noSNP$age + data_ncs_jacked_noSNP$diagnosis)
+
+res_ncs_2_jacked <- data.frame(cg = character(0),
+                               pvalue = numeric(0))
+
+n_samples <- ncol(data_ncs_jacked_noSNP_all)
+
+pvals_jack <- matrix(
+  NA_real_,
+  nrow = nrow(data_ncs_jacked_noSNP_all),
+  ncol = n_samples,
+  dimnames = list(rownames(data_ncs_jacked_noSNP_all), colnames(data_ncs_jacked_noSNP_all))
+)
+
+for (i in seq_len(n_samples)) {
+  
+  keep <- setdiff(seq_len(n_samples), i)
+  
+  y_jack <- data_ncs_jacked_noSNP_all[, keep, drop = FALSE]
+  
+  mod0 <- model.matrix(~ y_jack$age + y_jack$diagnosis)
+  mod1 <- model.matrix(~ y_jack$age + y_jack$diagnosis + y_jack$age:y_jack$diagnosis)
+  
+  res <- row_lm_f(y_jack, mod1, mod0)
+  
+  pvals_jack[, i] <- res$pvalue
+}
+
+# jackknife p-value = worst-case (max) across leave-one-out fits
+pval_max <- apply(pvals_jack, 1, max, na.rm = TRUE)
+
+pval_max <- res_ncs_1_jacked$pvalue
+
+pval_max_fdr <- p.adjust(pval_max, "fdr")
+
+res_ncs_1_jacked_fdr <- data.frame(
+  cg = rownames(data_ncs_jacked_noSNP_all),
+  pvalue_jack = pval_max,
+  pvalue_jack_fdr = pval_max_fdr
+)
+
+#res_ncs_1_jacked_fdr
+#res_ncs_2_jacked_fdr
+#res_ncs_2_jacked_fdr_alldata
+
+i <- which(res_ncs_1_jacked_fdr$pvalue_jack <= 0.05)
+ncs_noint_jacked <- res_ncs_1_jacked_fdr[i,]
+j <- order(res_ncs_1_jacked_fdr$pvalue_jack)[1:10]
+ncs_noint_jacked_top10 <- res_ncs_1_jacked_fdr[j,]
+
+k <- which(res_ncs_2_jacked_fdr$pvalue_jack <= 0.05)
+ncs_int_jacked <- res_ncs_2_jacked_fdr[k,]
+l <- order(res_ncs_2_jacked_fdr$pvalue_jack)[1:10]
+ncs_int_jacked_top10 <- res_ncs_2_jacked_fdr[l,]
+
+
+# find DMCs in progeria
+
+mod0 <- model.matrix(~ data_progeria_noSNP$age)
+mod1 <- model.matrix(~ data_progeria_noSNP$age + data_progeria_noSNP$diagnosis)
+
+res_progeria_1 <- row_lm_f(data_progeria_noSNP, mod1, mod0)
+
+i <- which(res_progeria_1$pvalue <= 0.05)
+i <- order(res_progeria_1$pvalue)[1:5] # 56552 cpgs
+length(i)
+
+progeria_noint <- res_progeria_1$pvalue[i]
+names(progeria_noint) <- rownames(res_progeria_1)[i]
+progeria_noint <- progeria_noint[order(progeria_noint)]
+
+
+fdr_progeria_1 <- p.adjust(res_progeria_1$pvalue, "fdr") <= 0.05
+sum(fdr_progeria_1) # 0
+
+progeria_noint_fdr_all <- rownames(data_progeria_noSNP)[fdr_progeria_1]
+
+bonf_progeria <- p.adjust(res_progeria_1$pvalue, "bonf") <= 0.05
+sum(bonf_progeria) #10
+
+lapply(cpgs_progeria_noint, function(cpg) {
+  png(filename = paste0("progeria_nosnps_noint_all_", cpg, ".png"),
+      width = 6, height = 6, units = "in", res = 300)
+  
+  plot(data_progeria$age, data_progeria[cpg, ],
+       col = lab2col(data_progeria$diagnosis),
+       pch = 19,
+       main = cpg)
+  
+  dev.off()
+})
+
+
+
+
+# use the filtered 61 CpGs
+#list_cpg_progeria <- which(rownames(data_progeria)[i] %in% cpg_list)
+
+#data_progeria <- data_progeria[list_cpg_progeria,]
+
+# find DMCs in progeria - interaction
+
+mod0 <- model.matrix(~ data_progeria_noSNP$age + data_progeria_noSNP$diagnosis)
+mod1 <- model.matrix(~ data_progeria_noSNP$age + data_progeria_noSNP$diagnosis + data_progeria_noSNP$age:data_progeria_noSNP$diagnosis)
+
+res_progeria_2 <- row_lm_f(data_progeria_noSNP, mod1, mod0)
+
+j <- which(res_progeria_2$pvalue <= 0.05)
+j <- order(res_progeria_2$pvalue)[1:5] #41249
+length(j)
+
+progeria_int <- res_progeria_2$pvalue[j]
+names(progeria_int) <- rownames(res_progeria_2)[j]
+progeria_int <- progeria_int[order(progeria_int)]
+
+progeria_int_all <- res_progeria_2$pvalue[j]
+names(progeria_int_all) <- rownames(res_progeria_2)[j]
+i <- which(names(progeria_int_all) %in% int_jacked_all)
+progeria_int_from_all <- progeria_int_all[i]
+progeria_int_from_all <- progeria_int_from_all[order(progeria_int_from_all)]
+
+
+fdr_progeria_2 <- p.adjust(res_progeria_2$pvalue, "fdr") <= 0.05
+sum(fdr_progeria_2) # 2629
+k <- order(fdr_progeria_2)[1:10]
+
+progeria_int_fdr_top10 <- fdr_progeria_2[k]
+names(progeria_int_fdr_top10) <- rownames(data_progeria_noSNP)[k]
+progeria_int_fdr_top10 <- progeria_int_fdr_top10[order(progeria_int_fdr_top10)]
+
+i <- which(rownames(data_progeria_noSNP) %in% common_ncsprogeria_int_fdr)
+progeria_int_fdr_from_ncs <- fdr_progeria_2[i]
+names(progeria_int_fdr_from_ncs) <- rownames(data_progeria_noSNP)[i]
+progeria_int_fdr_from_ncs<- 
+  progeria_int_fdr_from_ncs[order(progeria_int_fdr_from_ncs)]
+
+bonf_progeria_2 <- p.adjust(res_progeria_2$pvalue, "bonf") <= 0.05
+sum(bonf_progeria_2) #47
+
+# cpgs_progeria_2_classic - interaction, classic progeria
+# cpgs_progeria_2_all - interaction, all cases
+
+cols <- ifelse(data_progeria_noSNP$diagnosis == "control", "blue", "red")
+
+# plotting
+
+lapply(cpgs_progeria_2, function(cpg) {
+  png(filename = paste0("progeria_nosnps_int_classic_", cpg, ".png"),
+      width = 6, height = 6, units = "in", res = 300)
+  
+  plot(data_progeria_noSNP$age, data_progeria_noSNP[cpg, ],
+       col = cols,
+       pch = 19,
+       main = cpg)
+
+  legend("topright",
+         legend = c("control", "hgps"),
+         col = c("blue", "red"),
+         pch = 19,
+         bty = "n")  
+    
+  dev.off()
+})
+
+# find using filtered 61 CpGs
+list_cpg_progeria <- which(rownames(data_progeria)[fdr_progeria_2] %in% cpg_list)
+
+data_progeria <- data_progeria[list_cpg_progeria,]
+
+
+# find DMCs in Werner
+# no interaction - static
+
+mod0 <- model.matrix(~ data_werner_noSNP$age)
+mod1 <- model.matrix(~ data_werner_noSNP$age + data_werner_noSNP$diagnosis)
+
+res_werner_1 <- row_lm_f(data_werner_noSNP, mod1, mod0)
+
+m <- which(res_werner_1$pvalue <= 0.05)
+length(m)
+
+
+fdr_werner_1 <- p.adjust(res_werner_1$pvalue, "fdr")
+sum(fdr_werner_1)
+res_werner_1$pval_adj <- fdr_werner_1
+res_werner_1 <- res_werner_1[order(res_werner_1$pval_adj),]
+
+i <- which(res_werner_1$pval_adj <= 0.05)
+werner_noint_fdr <- res_werner_1$pval_adj[i]
+names(werner_noint_fdr) <- rownames(res_werner_1)[i]
+werner_noint_fdr <- werner_noint_fdr[order(werner_noint_fdr)]
+
+
+j <- which(res_werner_1$pvalue <= 0.05)
+werner_noint <- res_werner_1$pvalue[j]
+names(werner_noint) <- rownames(res_werner_1)[j]
+werner_noint <- werner_noint[order(werner_noint)]
+
+
+bonf_werner_1 <- p.adjust(res_werner_1$pvalue, "bonf") <= 0.05
+sum(bonf_werner_1)
+
+
+
+
+# find DMCs in Werner - interaction
+
+mod0 <- model.matrix(~ data_werner_noSNP$age + data_werner_noSNP$diagnosis)
+mod1 <- model.matrix(~ data_werner_noSNP$age + data_werner_noSNP$diagnosis + data_werner_noSNP$age:data_werner_noSNP$diagnosis)
+
+res_werner_2 <- row_lm_f(data_werner_noSNP, mod1, mod0)
+
+n <- which(res_werner_2$pvalue <= 0.05)
+n <- order(res_werner_2$pvalue)
+length(n)
+
+werner_int <- res_werner_2$pvalue[n]
+names(werner_int) <- rownames(res_werner_2)[n]
+werner_int <- werner_int[order(werner_int)]
+
+fdr_werner_2 <- p.adjust(res_werner_2$pvalue, "fdr") <=0.05
+sum(fdr_werner_2)
+
+
+
+bonf_werner_2 <- p.adjust(res_werner_2$pvalue, "bonf") <= 0.05
+sum(bonf_werner_2)
+
+
+lapply(cpgs_werner_2, function(cpg) {
+  png(filename = paste0("werner_filtered_int_all_", cpg, ".png"),
+      width = 6, height = 6, units = "in", res = 300)
+  
+  plot(data_werner$age, data_werner[cpg, ],
+       col = lab2col(data_werner$diagnosis),
+       pch = 19,
+       main = cpg)
+  
+  dev.off()
+})
+
+
+# cpgs_werner_1_classic - no interaction, classic
+# cpgs_werner_1_all - no interaction, all cases
+common_ws <- cpgs_werner_1_all %in% cpgs_werner_1_classic
+
+
+# find DMCs in NCS
+#no interaction - static
+
+mod0 <- model.matrix(~ data_ncs_noSNP$age)
+mod1 <- model.matrix(~ data_ncs_noSNP$age + data_ncs_noSNP$diagnosis)
+
+res_ncs_1 <- row_lm_f(data_ncs_noSNP, mod1, mod0)
+
+k <- which(res_ncs_1$pvalue <= 0.05) #19368 sites
+k <- order(res_ncs_1$pvalue)[1:10]
+length(k)
+
+ncs_noint_all_top <- res_ncs_1[k,]
+ncs_noint_all <- res_ncs_1$pval[k]
+names(ncs_noint_all) <- rownames(res_ncs_1)[k]
+
+
+l <- which(names(ncs_noint_all) %in% noint_jacked_all)
+ncs_noint_from_all <- ncs_noint_all[l]
+
+ncs_noint_from_all <- ncs_noint_from_all[order(ncs_noint_from_all)]
+
+fdr_ncs_1 <- p.adjust(res_ncs_1$pvalue, "fdr") <=0.05
+i <- order(fdr_ncs_1)[1:10]
+sum(fdr_ncs_1) # 30
+
+# store DMCs
+ncs_noint_no30_top10 <- res_ncs_1[k,]
+ncs_noint_fdr_top10 <- fdr_ncs_1[i]
+names(ncs_noint_fdr_top10) <- rownames(data_ncs_noSNP)[i]
+ncs_noint_fdr_top10 <- ncs_noint_fdr_top10[order(ncs_noint_fdr_top10)]
+
+i <- which(rownames(data_ncs_noSNP) %in% common_ncswerner_noint_fdr)
+ncs_noint_fdr_fromwerner <- fdr_ncs_1[i]
+names(ncs_noint_fdr_fromwerner) <- rownames(data_ncs_noSNP)[i]
+ncs_noint_fdr_fromwerner <- ncs_noint_fdr_fromwerner[order(ncs_noint_fdr_fromwerner)]
+
+
+
+bonf_ncs_1 <- p.adjust(res_ncs_1$pvalue, "bonf") <= 0.05
+sum(bonf_ncs_1) # 9
+
+cols <- ifelse(data_ncs_classic_noSNP$diagnosis == "control", "blue", "red")
+
+lapply(cpgs_ncs_1, function(cpg) {
+  png(filename = paste0("ncs_noint_no20_", cpg, ".png"),
+      width = 6, height = 6, units = "in", res = 300)
+  
+  plot(data_ncs_classic_noSNP$age, data_ncs_classic_noSNP[cpg, ],
+       col = cols,
+       pch = 19,
+       main = cpg)
+  
+  legend("topright",
+         legend = c("control", "ncs"),
+         col = c("blue", "red"),
+         pch = 19,
+         bty = "n")
+  
+  dev.off()
+})
+
+# find DMCs in NCS - interaction
+
+data_ncs_noSNP_fil <- data_ncs_noSNP[data_ncs_noSNP]
+
+mod0 <- model.matrix(~ data_ncs_noSNP$age + data_ncs_noSNP$diagnosis)
+mod1 <- model.matrix(~ data_ncs_noSNP$age + data_ncs_noSNP$diagnosis + data_ncs_noSNP$age:data_ncs_noSNP$diagnosis)
+
+res_ncs_2 <- row_lm_f(data_ncs_noSNP, mod1, mod0)
+
+l <- which(res_ncs_2$pvalue <= 0.05) #29022 sites
+length(l)
+
+ncs_int_all <- rownames(data_ncs_noSNP)[l]
+
+fdr_ncs_2 <- p.adjust(res_ncs_2$pvalue, "fdr")
+sum(fdr_ncs_2) # 1543
+j <- order(fdr_ncs_2)[1:10]
+
+# store DMCs
+ncs_int_fdr_all <- rownames(data_ncs_noSNP)[fdr_ncs_2]
+ncs_int_fdr_top10 <- fdr_ncs_2[j]
+names(ncs_int_fdr_top10) <- rownames(data_ncs_noSNP)[j]
+ncs_int_fdr_top10 <- ncs_int_fdr_top10[order(ncs_int_fdr_top10)]
+
+i <- which(rownames(data_ncs_noSNP) %in% common_ncsprogeria_int_fdr)
+ncs_int_fdr_from_progeria <- fdr_ncs_2[i]
+names(ncs_int_fdr_from_progeria) <- rownames(data_ncs_noSNP)[i]
+ncs_int_fdr_from_progeria <- ncs_int_fdr_from_progeria[order(ncs_int_fdr_from_progeria)]
+
+
+bonf_ncs_2 <- p.adjust(res_ncs_2$pvalue, "bonf") <= 0.05
+sum(bonf_ncs_2) # 275
+
+cols <- ifelse(data_ncs$diagnosis == "control", "blue", "red")
+
+
+i <- which(rownames(data_ncs) %in% cpgs_progeria_2)
+
+lapply(cpgs_ncs_2, function(cpg) {
+  png(filename = paste0("ncs_all_from_hgps_", cpg, ".png"),
+      width = 6, height = 6, units = "in", res = 300)
+  
+  plot(data_ncs$age, data_ncs[cpg, ],
+       col = cols,
+       pch = 19,
+       main = cpg)
+
+  legend("topright",
+         legend = c("control", "ncs"),
+         col = c("blue", "red"),
+         pch = 19,
+         bty = "n")  
+    
+  dev.off()
+})
+
+
+common_int_ncs_progeria <- intersect(ncs_int_fdr, progeria_int_fdr)
+common_noint_ncs_werner <- intersect(ncs_noint_fdr, werner_noint_fdr)
+common_int_progeria_noint_werner <- intersect(progeria_int_fdr, werner_noint_fdr)
+
+common_all <- intersect(progeria_noint, ncs_noint)
+common_all <- intersect(common_all, werner_noint)
+common_all_noint <- common_all
+intersect()
+
+common_all_int <- intersect(progeria_int, ncs_int)
+common_all_int <- intersect(common_all_int, werner_int)
+cgs <- intersect(common_all_int, ncs_int_fdr)
+
+int_fdr <- c("cg13421038", "cg00461650", "cg06393098", "cg16358034", "cg16265348")
+noint_fdr <- c("cg10493186", "cg20902757", "cg09701700", "cg09092525", "cg02792617")
+
+
+common_ncs_int_fdr_fromall #5
+
+
+data_ncs_noSNP$diagnosis[data_ncs_noSNP$diagnosis=="control"] <- "control NCS"
+data_progeria_noSNP$diagnosis[data_progeria_noSNP$diagnosis=="control"] <- "control HGPS"
+data_werner_noSNP$diagnosis[data_werner_noSNP$diagnosis=="control"] <- "control Werner"
+
+
+
+
+# List of datasets and their disease labels
+datasets <- list(
+  "NCS"      = data_ncs_noSNP[,data_ncs_noSNP$diagnosis == "NCS"],
+  "control NCS" = data_ncs_noSNP[,data_ncs_noSNP$diagnosis == "control NCS"],
+  "HGPS" = data_progeria_noSNP[,data_progeria_noSNP$diagnosis == "HGPS"],
+  "control HGPS" = data_progeria_noSNP[,data_progeria_noSNP$diagnosis == "control HGPS"],
+  "Werner" = data_werner_noSNP[,data_werner_noSNP$diagnosis == "Werner"],
+  "control Werner" = data_werner_noSNP[,data_werner_noSNP$diagnosis == "control Werner"]
+)
+
+datasets <- list(
+  "Werner" = data_werner_noSNP[,data_werner_noSNP$diagnosis == "Werner"],
+  "control Werner" = data_werner_noSNP[,data_werner_noSNP$diagnosis == "control Werner"])
+
+
+
+
+
+'
+Čia pora spalvų pasiūlymų derinių
+"#FAA43A" ir "#DECF3F"
+"steelblue3" ir "deepskyblue" - progeria
+"#60BD68" ir "lightgreen" - ncs
+"mediumpurple1" ir "slateblue3" -werner
+'
+
+datasets <- list(
+  "controls" = controls,
+  "control NCS" = data_ncs_noSNP[,data_ncs_noSNP$diagnosis == "control NCS"],
+  "NCS"      = data_ncs_noSNP[,data_ncs_noSNP$diagnosis == "NCS"]
+  )
+
+# Colors for disease groups
+disease2col <- c(
+  "controls" = "lightgrey",
+  "control NCS" = "lightgreen",
+  "NCS" = "#60BD68"
+  )
+
+
+datasets_seq <- list(
+  "controls" = controls,
+  "control HGPS" = data_progeria_noSNP[,data_progeria_noSNP$diagnosis == "control HGPS"],
+  "HGPS" = data_progeria_noSNP[,data_progeria_noSNP$diagnosis == "HGPS"],
+  "control Werner" = data_werner_noSNP[,data_werner_noSNP$diagnosis == "control Werner"],
+  "Werner" = data_werner_noSNP[,data_werner_noSNP$diagnosis == "Werner"],
+  "control NCS" = data_ncs_noSNP[,data_ncs_noSNP$diagnosis == "control NCS"],
+  "NCS"      = data_ncs_noSNP[,data_ncs_noSNP$diagnosis == "NCS"]
+)
+
+disease2col_seq <- c(
+  "controls" = "lightgrey",
+  "control HGPS" = "deepskyblue",
+  "HGPS" = "steelblue3",
+  "control Werner" = "mediumpurple1",
+  "Werner" = "slateblue3",
+  "control NCS" = "lightgreen",
+  "NCS" = "#60BD68"
+)
+
+#CONTROLS
+controls_young <- readRDS("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/almstrup_annmatrix.rds")
+controls_old <- readRDS("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/johansson_annmatrix.rds")
+controls_epic <- readRDS("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/fraga.rds")
+controls <- readRDS("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/wiegand.rds")
+controls <- readRDS("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/zhuang.rds")
+
+controls_450k <- cbind(controls_old, controls_young)
+remove(controls_old)
+remove(controls_young)
+
+controls_epic <- cbind(controls_epic, controls)
+remove(controls)
+
+n <- max(nrow(controls_450k), nrow(controls_epic))
+
+controls_450k[(nrow(controls_450k)+1):n, ] <- NA
+df2[(nrow(df2) + 1):n, ] <- NA
+
+result <- cbind(df1, df2)
+
+
+cgs <- c("cg07318983", "cg17760318", "cg10181615", "cg00212031", "cg00213748")
+ 
+# Determine age and modification ranges for consistent axes
+all_ages <- unlist(lapply(datasets, function(d) d$age))
+all_vals <- unlist(lapply(datasets, function(d) {
+  cg_vals <- rownames(d)[rownames(d) %in% cgs]
+  as.vector(d[cg_vals, , drop = FALSE] * 100)
+}))
+xlim <- c(0,100)
+ylim <- c(0,100)
+
+cgs <- names(progeria_int_from_all)
+
+
+##### PROGERIA ####
+
+format_p_NCS <- function(p) {
+  if (is.na(p)) return("p = NA")
+  if (p < 1e-3) {
+    paste0("NCS p = ", formatC(p, format = "e", digits = 2))
+  } else {
+    paste0("NCS p = ", signif(p, 3))
+  }
+}
+
+format_p_WS <- function(p) {
+  if (is.na(p)) return("p = NA")
+  if (p < 1e-3) {
+    paste0("WS p = ", formatC(p, format = "e", digits = 2))
+  } else {
+    paste0("WS p = ", signif(p, 3))
+  }
+}
+
+format_p_HGPS <- function(p) {
+  if (is.na(p)) return("p = NA")
+  if (p < 1e-3) {
+    paste0("HGPS p = ", formatC(p, format = "e", digits = 2))
+  } else {
+    paste0("HGPS p = ", signif(p, 3))
+  }
+}
+
+xlim <- c(0,35)
+ylim <- c(0,100)
+
+dev.off()
+
+cgs <- progeria_noint_top10[1:5]
+cgs <- c("cg05084282", "cg22615323", "cg22495669", "cg13054642", "cg24524750")
+
+# Open PDF
+pdf("ncs_int_top5.pdf", width = 15/2.54, height = 4/2.54, pointsize = 8)
+par(mfrow = c(1,5), mar = c(2,1,4,1), oma = c(3,5,1,2), tck = -0.02, mgp = c(2,0.5,0), lwd = 0.5)
+
+for(cg in cgs) {
+  
+  p_ncs <- numeric(0)
+  p_ws <- numeric(0)
+  p_hgps <- numeric(0)
+  
+  if(cg %in% c("cg24263283","cg16619777","cg14219337","cg06476663","cg12010476","cg05084282", "cg22615323", "cg22495669", "cg16271823", "cg06648629", "cg00040047", "cg11503487", "cg03522247")) {
+    ylim_cur <- c(60, 100)
+  } else if(cg %in% c("cg10099651","cg10181615", "cg03688699", "cg13767294","cg23026246", "cg02015280","cg05578030","cg26746936","cg05666828", "cg24524750", "cg05702448", "cg15740437", "cg00662232", "cg06581978", "ch.3.1455028R", "cg23668424")) {
+    ylim_cur <- c(0, 15)
+  } else if (cg %in% c("cg21636683", "cg17931986", "cg10413224", "cg24616385", "cg08113002")) {
+    ylim_cur <- c(20, 100)
+  } else if (cg %in% c("cg12374721","cg07318983", "cg25378916","cg13054642", "cg23525360", "cg13170705", "cg08112929", "cg24782378", "cg01267532")) {
+    ylim_cur <- c(0, 25)
+  }
+  else {
+
+    all_y <- unlist(lapply(datasets, function(d) {
+      if(cg %in% rownames(d)) d[cg,]*100 else NULL
+    }))
+    ylim_cur <- c(0,100)
+    ylim_cur <- ylim_cur + c(-0.05, 0.05) * diff(ylim_cur)  # add 5% padding
+  }
+  
+
+  plot(NA, xlim = xlim, ylim = ylim_cur, xlab = "", yaxt = "n",  xaxt = "n",yaxs = "i", type = "n")
+  
+  if (cg %in% rownames(controls)) {
+    points(controls$age, controls[cg,] * 100, 
+           col = adjustcolor("lightgrey", alpha.f = 0.1), 
+           pch = 19, cex = 1)
+  }
+  if (cg %in% rownames(controls_450k)) {
+    points(controls_450k$age, controls_450k[cg,] * 100, 
+           col = adjustcolor("lightgrey", alpha.f = 0.1), 
+           pch = 19, cex = 1)
+  }
+  
+  # --- Add points, mean line, and regression line ---
+  for(disease in names(datasets)) {
+    d <- datasets[[disease]]
+    if(cg %in% rownames(d)) {
+      y_vals <- d[cg,] * 100
+      x_vals <- d$age
+      
+      if (disease != "controls"){
+      # semi-transparent, slightly jittered points
+      points(x_vals + runif(length(x_vals), -0.2, 0.2), y_vals, 
+             col = "black", bg =adjustcolor(disease2col[disease], alpha.f = 0.9), 
+             pch = 21, cex = 1)
+      
+      # soft horizontal mean line
+      abline(h = mean(y_vals, na.rm = TRUE), 
+             col = adjustcolor(disease2col[disease], alpha.f = 0.4), 
+             lwd = 2, lty = 2)  # dashed
+      
+      # regression line within data range
+      if(length(x_vals) > 1) {
+        fit <- lm(y_vals ~ x_vals)
+        x_line <- range(x_vals, na.rm = TRUE)
+        y_line <- predict(fit, newdata = data.frame(x_vals = x_line))
+        lines(x_line, y_line, col = adjustcolor(disease2col[disease], alpha.f = 0.4),
+              lwd = 2)
+      }
+    
+    
+    # --- p-value labels ---
+      if (disease == "NCS") {
+        p_ncs <<- ncs_int_top5[[cg]]
+      } else if (disease == "HGPS") {
+        p_hgps <<- progeria_int_top5[[cg]]
+      } else if (disease == "Werner") {
+       p_ws <<- werner_int_top5[[cg]]
+      }
+      
+    }
+   }
+  title(cg, line = 0.5)
+  
+
+    title(ylab = "Modification (%)", line = 2.5, font = 1, outer = TRUE)
+    axis(2, las = 2, lwd = 0.5, lwd.ticks = 0.5)
+    x_ticks <- seq(floor(xlim[1]), ceiling(xlim[2]), by = 10,)
+    axis(1, at = x_ticks, labels = x_ticks, cex.axis = 1, lwd = 0.5, lwd.ticks = 0.5)
+    title(xlab = "Age (years)", line = 1.5, font = 1, outer = TRUE)
+
+  'if(cg == cgs[18]){
+    title(xlab = "Age (years)")
+  }'
+
+  }
+  legend("topright",
+         legend = paste(c( "p = "),
+                        signif(c(p_ncs), 2)),
+         bty = 'n',
+         cex = 0.7
+  )
+}
+
+legend(
+  x      = "bottomright",
+  legend = names(datasets),
+  text.width = strwidth(names(datasets)),
+  col    = disease2col,
+  pch    = 19,
+  bty    = 'n',
+  inset  = c(0, 1.2),
+  xpd    = NA,
+  horiz  = TRUE
+)
+
+invisible(dev.off())
+
+
+
+# cpgs_ncs_1_classic - no interaction, classic
+# cpgs_ncs_2_classic - interaction, classic
+common_ncs_classic <- cpgs_ncs_2_classic %in% cpgs_ncs_1_classic
+# cpgs_ncs_1_all - no interaction, all cases
+# cpgs_ncs_2_all - interaction, all cases
+common_ncs_all <- cpgs_ncs_1_all %in% cpgs_ncs_2_all
+
+common_ncs_1 <- cpgs_ncs_1_classic %in% cpgs_ncs_1_all
+common_ncs_2 <- cpgs_ncs_2_classic %in% cpgs_ncs_2_all
+
+common_ncs <- intersect(intersect(intersect(cpgs_ncs_1_classic, cpgs_ncs_2_classic), cpgs_ncs_1_all), cpgs_ncs_2_all)
+
+
+plot(data_ncs$age, data_ncs["cg16742703",], col = lab2col(data_ncs$diagnosis, ref = data_ncs$diagnosis), pch=19)
+
+plot(data_progeria$age, data_progeria["cg16742703",], col = lab2col(data_progeria$diagnosis, ref = data_progeria$diagnosis), pch=19)
+
+fill = c("#60BD68", "steelblue3", "slateblue3")
+# Venn diagrams
+
+pdf("venn_noint.pdf", width = 4, height = 4, pointsize = 10)
+
+venn_common_noint <- venn.diagram(
+  x = list(
+    NCS    = ncs_noint,
+    HGPS = names(progeria_noint),
+    Werner = names(werner_noint)
+  ),
+  fill = c("#60BD68","steelblue3","slateblue3"),
+  alpha = 0.5,
+  
+  cat.pos = c(-30, 30, -180),     # label angles
+  cat.dist = c(0.05, 0.05, 0.03),  # distance from circles
+  
+  filename = NULL,
+  width = 2500,
+  height = 2500,
+  resolution = 300
+)
+
+
+
+grid::grid.draw(venn_common_noint)
+invisible(dev.off())
+
+grid::grid.newpage()
+
+common_int_fdr <- intersect(ncs_int_fdr, progeria_int_fdr)
+common_int_fdr <- intersect(common_int_fdr, werner_int)
+
+
+common_all_int <- intersect(intersect(ncs_int, progeria_int), werner_int)
+
+
+
+common_ncs_int_fdr_fromall <- intersect(common_all_int, ncs_int_fdr)
+
+
+common_progeria_int_fdr_fromall <- intersect(common_all_int, progeria_int_fdr)
+#nera bendru
+common_ncsprogeria_int_fdr <- intersect(ncs_int_fdr, progeria_int_fdr)
+
+
+common_noint_from_wernerncs <- intersect(ncs_noint, werner_noint)
+common_noint_all <- length(intersect(common_noint_from_wernerncs, progeria_noint_classic))
+ncs_fdr_noint_from_common_wernerncs <- intersect(ncs_noint_fdr, common_noint_from_wernerncs) #3
+werner_fdr_noint_from_common_wernerncs <- intersect(werner_noint_fdr, common_noint_from_wernerncs) #0
+
+
+common_noint_wernerprogeria <- intersect(werner_noint, progeria_noint)
+common_progeriawerner_noint_fdr <- intersect(werner_noint_fdr, common_noint_wernerprogeria) #13
+
+intersect(common_progeriawerner_noint_fdr, ncs_noint)#0
+
+werner_fdr_noint_from_common_wernerncs <- intersect(werner_noint_fdr, common_noint_from_wernerncs) #48
+# intersect of both - 1 ("cg10493186")
+cg_noint <- "cg10493186"
+werner_fdr_noint_from_common_all <- intersect(werner_noint_fdr, common_noint_all)#0
+
+common_noint_from_progeriancs <- intersect(ncs_noint, progeria_noint_classic) #939
+ncs_fdr_noint_from_common_progeriancs <- intersect(ncs_noint_fdr, common_noint_from_progeriancs) #0
+
+common_noint_from_wernerprogeria <- intersect(werner_noint, progeria_noint)
+common_noint_from_wernerprogeria_classic <- intersect(werner_noint, progeria_noint_classic)
+werner_fdr_noint_from_common_progeriawerner <- intersect(werner_noint_fdr, common_noint_from_wernerprogeria) #13, nera common su ncs
+werner_fdr_noint_from_common_progeriawerner_classic <- intersect(werner_noint_fdr, common_noint_from_wernerprogeria_classic)
+
+
+
+ncs_int_from_all <- which(common_all_int %in% ncs_int_fdr)
+progeria_int_from_all <- which(common_all_int %in% progeria_int_fdr)
+
+common_all_noint <- intersect(intersect(ncs_noint, progeria_noint), werner_noint)
+
+
+
+# plotting
+
+lapply(common_ncs_progeria_all, function(cpg) {
+  png(filename = paste0("common_ncs_progeria_int_all_", cpg, ".png"),
+      width = 6, height = 6, units = "in", res = 300)
+  
+  dev.off()
+})
+
+color_map <- c(
+  "control_ncs"      = "pink",
+  "ncs"       = "purple",
+  "control_werner"   = "orange",
+  "werner"    = "red",
+  "control_hgps" = "green",
+  "hgps"  = "blue"
+)
+
+
+lapply (common_ncs_progeria_all, function (cpg) {
+  
+  df_ncs <- data.frame(Methylation = data_ncs_noSNP[cpg,],
+                   Age = data_ncs_noSNP$age,
+                   Group = data_ncs_noSNP$diagnosis)
+  
+  df_ncs$Group[df_ncs$Group == "control"] <- "control_ncs"
+  
+  df_progeria <- data.frame(Methylation = data_progeria_noSNP[cpg,],
+                            Age = data_progeria_noSNP$age,
+                            Group = data_progeria_noSNP$diagnosis)
+  
+  df_progeria$Group[df_progeria$Group == "control"] <- "control_hgps"
+  
+  df <- rbind(df_ncs, df_progeria)
+  
+  p <- ggplot(df, aes(x = Age, y = Methylation, color = Group)) +
+    geom_point(alpha = 0.7) +
+    scale_color_manual(values = color_map) +
+    geom_smooth(method = "lm", se = FALSE) +
+    labs(
+      title = paste(cpg),
+      x = "Age",
+      y = "Methylation",
+      color = "Disease Group"
+    ) +
+    theme_bw() +
+    theme(
+      legend.position = "right",
+      legend.title = element_text(size = 10),
+      legend.text  = element_text(size = 8))
+  
+  ggsave(
+    filename = paste0("werner_progeria_noSNPS_", cpg, ".png"),
+    plot = p,
+    width = 10,
+    height = 6,
+    dpi = 300
+  )
+  
+} )
+
+
+
+common_ncs_werner_noint <- intersect(cpgs_ncs_1_all, cpgs_werner_1_classic)
+
+lapply (common_ncs_werner_noint, function (cpg) {
+  
+  df_ncs <- data.frame(Methylation = data_ncs_noSNP[cpg,],
+                       Age = data_ncs_noSNP$age,
+                       Group = data_ncs_noSNP$diagnosis)
+  
+  df_ncs$Group[df_ncs$Group == "control"] <- "control_ncs"
+  
+  df_werner <- data.frame(Methylation = data_werner_noSNP[cpg,],
+                            Age = data_werner_noSNP$age,
+                            Group = data_werner_noSNP$diagnosis)
+  
+  df_werner$Group[df_werner$Group == "control"] <- "control_werner"
+  
+  df <- rbind(df_ncs, df_werner)
+  
+  p <- ggplot(df, aes(x = Age, y = Methylation, color = Group)) +
+    geom_point(alpha = 0.7) +
+    scale_color_manual(values = color_map) +
+    geom_smooth(method = "lm", se = FALSE) +
+    labs(
+      title = paste(cpg),
+      x = "Age",
+      y = "Methylation",
+      color = "Disease Group"
+    ) +
+    theme_bw() +
+    theme(
+      legend.position = "right",
+      legend.title = element_text(size = 10),
+      legend.text  = element_text(size = 8))
+  
+  ggsave(
+    filename = paste0("ncs_werner_noint_noSNPS_", cpg, ".png"),
+    plot = p,
+    width = 10,
+    height = 6,
+    dpi = 300
+  )
+  
+} )
+
+
+common_ncs_int_werner <- intersect(cpgs_ncs_2_all, cpgs_werner_1_classic)
+
+lapply (common_ncs_int_werner, function (cpg) {
+  
+  df_ncs <- data.frame(Methylation = data_ncs_noSNP[cpg,],
+                       Age = data_ncs_noSNP$age,
+                       Group = data_ncs_noSNP$diagnosis)
+  
+  df_ncs$Group[df_ncs$Group == "control"] <- "control_ncs"
+  
+  df_werner <- data.frame(Methylation = data_werner_noSNP[cpg,],
+                          Age = data_werner_noSNP$age,
+                          Group = data_werner_noSNP$diagnosis)
+  
+  df_werner$Group[df_werner$Group == "control"] <- "control_werner"
+  
+  df <- rbind(df_ncs, df_werner)
+  
+  p <- ggplot(df, aes(x = Age, y = Methylation, color = Group)) +
+    geom_point(alpha = 0.7) +
+    scale_color_manual(values = color_map) +
+    geom_smooth(method = "lm", se = FALSE) +
+    labs(
+      title = paste(cpg),
+      x = "Age",
+      y = "Methylation",
+      color = "Disease Group"
+    ) +
+    theme_bw() +
+    theme(
+      legend.position = "right",
+      legend.title = element_text(size = 10),
+      legend.text  = element_text(size = 8))
+  
+  ggsave(
+    filename = paste0("ncs_int_werner_noSNPS_", cpg, ".png"),
+    plot = p,
+    width = 10,
+    height = 6,
+    dpi = 300
+  )
+  
+} )
+
+
+
+
+# GO ANALYSIS
+
+ncs_fdr_all <- unique(c(ncs_int_fdr_all, ncs_noint_fdr_all))
+progeria_fdr_all <- progeria_int_fdr_all
+werner_fdr_all <- werner_noint_fdr_all
+
+saveRDS(ncs_fdr_all, file="ncs_DMCs.RData")
+saveRDS(progeria_fdr_all, file="progeria_DMCs.RData")
+saveRDS(werner_fdr_all, file="werner_DMCs.RData")
+
+ncs_fdr_all <- readRDS("ncs_DMCs.RData")
+progeria_fdr_all <- readRDS("progeria_DMCs.RData")
+werner_fdr_all <- readRDS("werner_DMCs.RData")
+
+ncs_all <- rownames(data_ncs_noSNP)
+progeria_all <- rownames(data_progeria_noSNP)
+werner_all <- rownames(data_werner_noSNP)
+
+inter1 <- intersect(ncs_fdr_all, progeria_fdr_all)
+inter2 <- intersect(ncs_fdr_all, werner_fdr_all)
+inter3 <- intersect(werner_fdr_all, progeria_fdr_all)
+
+'
+disease2col <- c(
+  "control NCS" = "lightgreen",
+  "control Werner" = "mediumpurple1",
+  "Werner" = "slateblue3",
+  "control HGPS" = "deepskyblue",
+  "HGPS" = "steelblue3",
+  "NCS" = "#60BD68"
+)
+'
+
+
+ncs_noint_downregulated <- numeric()
+ncs_noint_upregulated   <- numeric()
+
+ncs_noint_downregulated <- ncs_noint_jacked_mean_GO[ncs_noint_jacked_mean_GO > ncs_noint_jacked_mean_GO_controls]
+ncs_noint_upregulated   <- ncs_noint_jacked_mean_GO[ncs_noint_jacked_mean_GO < ncs_noint_jacked_mean_GO_controls]
+
+df_up <- ncs_noint_jacked[ncs_noint_jacked$cg %in% names(ncs_noint_upregulated),]
+df_up <- df_up[order(df_up$pvalue_jack), ]
+ncs_noint_jacked_upregulated_top100 <- head(df_up$cg, 100)
+
+
+noint_werner_mean <- data_werner[werner_noint_fdr_all,]
+noint_werner_mean_control <- noint_werner_mean[,noint_werner_mean$diagnosis == "control"]
+noint_werner_mean_disease<- noint_werner_mean[,noint_werner_mean$diagnosis == "werner"]
+werner_noint_jacked_mean_GO <- rowMeans(noint_werner_mean_disease)
+werner_noint_jacked_mean_GO_control <- rowMeans(noint_werner_mean_control)
+
+werner_noint_downregulated <- numeric()
+werner_noint_upregulated   <- numeric()
+
+werner_noint_downregulated <- werner_noint_jacked_mean_GO[werner_noint_jacked_mean_GO > werner_noint_jacked_mean_GO_control]
+werner_noint_upregulated <- werner_noint_jacked_mean_GO[werner_noint_jacked_mean_GO < werner_noint_jacked_mean_GO_control]
+
+df_down_werner <- res_werner_1[rownames(res_werner_1) %in% names(werner_noint_downregulated),]
+df_down_werner <- df_down_werner[order(df_down_werner$pvalue), ]
+werner_noint_downregulated_top100 <- head(rownames(df_down_werner), 100)
+
+noint_progeria_mean <- data_progeria_noSNP[progeria_noint,]
+noint_progeria_mean_control <- noint_progeria_mean[,noint_progeria_mean$diagnosis == "control HGPS"]
+noint_progeria_mean_disease<- noint_progeria_mean[,noint_progeria_mean$diagnosis == "HGPS"]
+progeria_noint_jacked_mean_GO <- rowMeans(noint_progeria_mean_disease)
+progeria_noint_jacked_mean_GO_control <- rowMeans(noint_progeria_mean_control)
+
+progeria_noint_downregulated <- numeric()
+progeria_noint_upregulated   <- numeric()
+
+progeria_noint_downregulated <- progeria_noint_jacked_mean_GO[progeria_noint_jacked_mean_GO > progeria_noint_jacked_mean_GO_control]
+progeria_noint_upregulated <- progeria_noint_jacked_mean_GO[progeria_noint_jacked_mean_GO < progeria_noint_jacked_mean_GO_control]
+
+df_down_progeria <- res_progeria_1[rownames(res_progeria_1) %in% names(progeria_noint_downregulated),]
+df_down_progeria <- df_down_progeria[order(df_down_progeria$pvalue), ]
+progeria_noint_downregulated_top100 <- head(rownames(df_down_progeria), 100)
+
+df_up_progeria <- res_progeria_1[rownames(res_progeria_1) %in% names(progeria_noint_upregulated),]
+df_up_progeria <- df_up_progeria[order(df_up_progeria$pvalue), ]
+progeria_noint_upregulated_top100 <- head(rownames(df_up_progeria), 100)
+
+#### INTERACTION ####
+int_ncs_mean <- data_ncs[ncs_int_jacked$cg,]
+
+int_ncs_mean_control <- int_ncs_mean[,int_ncs_mean$diagnosis == "control"]
+int_ncs_mean_disease<- int_ncs_mean[,int_ncs_mean$diagnosis == "ncs"]
+ncs_int_jacked_mean_GO <- rowMeans(int_ncs_mean_disease)
+ncs_int_jacked_mean_GO_control <- rowMeans(int_ncs_mean_control)
+
+ncs_int_downregulated <- numeric()
+ncs_int_upregulated   <- numeric()
+
+ncs_int_downregulated <- ncs_int_jacked_mean_GO[ncs_int_jacked_mean_GO > ncs_int_jacked_mean_GO_control]
+ncs_int_upregulated <- ncs_int_jacked_mean_GO[ncs_int_jacked_mean_GO < ncs_int_jacked_mean_GO_control]
+
+df_down_ncs_int <- ncs_int_jacked[ncs_int_jacked$cg %in% names(ncs_int_downregulated),]
+df_down_ncs_int <- df_down_ncs_int[order(df_down_ncs_int$pvalue_jack), ]
+ncs_int_downregulated_top100 <- head(rownames(df_down_ncs_int), 100)
+
+df_up_ncs_int <- ncs_int_jacked[ncs_int_jacked$cg %in% names(ncs_int_upregulated),]
+df_up_ncs_int <- df_up_ncs_int[order(df_up_ncs_int$pvalue_jack), ]
+ncs_int_upregulated_top100 <- head(rownames(df_up_ncs_int), 100)
+
+
+saveRDS(df_up_progeria, "df_up_progeria.RData")
+
+BiocManager::install("IlluminaHumanMethylationEPICanno.ilm10b4.hg38")
+BiocManager::install("IlluminaHumanMethylation450kanno.ilmn12.hg38")
+BiocManager::install("clusterProfiler")
+BiocManager::install("missMethyl")
+BiocManager::install("karyoploteR")
+
+library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+library(dplyr)
+library(tidyr)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(missMethyl)
+library(karyoploteR)
+library(biomaRt)
+library(tidyr)
+
+ensembl <- useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl", mirror = "www")
+
+gometh(
+  sig.cpg = ncs_fdr_all,
+  all.cpg = ncs_all,
+  collection = "GO"
+)
+
+
+top_go <- go_df_ncs_int_down %>%
+  filter(ONTOLOGY == "MF") %>%
+  arrange(FDR) %>%
+  slice_head(n = 10)
+
+top_go[["TERM"]] <- as.character(top_go[["TERM"]])
+ggplot(top_go, aes(x = reorder(`TERM`, -log10(FDR)),
+                      y = -log10(FDR))) +
+  geom_col() +
+  coord_flip() +
+  labs(x = "", y = "-log10(FDR)",
+       title = "Top GO MF Processes") +
+  theme_bw()
+
+
+
+
+
+anno_epic <- getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+anno_450k <- getAnnotation(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+
+coords_epic <- as.data.frame(anno_epic[, c("Name", "chr", "pos")])
+coords_450k <- as.data.frame(anno_450k[, c("Name", "chr", "pos")])
+
+
+
+# Select CpG ID and gene column
+cpg2gene_450k <- anno_450k[, c("Name", "UCSC_RefGene_Name")]
+cpg2gene_epic <- anno_epic[, c("Name", "UCSC_RefGene_Name")]
+
+cpg2gene_450k <- as.data.frame(cpg2gene_450k)
+cpg2gene_epic <- as.data.frame(cpg2gene_epic)
+
+
+
+# Split multiple genes per CpG into separate rows
+cpg2gene_450k <- cpg2gene_450k %>%
+  tidyr::separate_rows(UCSC_RefGene_Name, sep = ";") %>%
+  dplyr::filter(UCSC_RefGene_Name != "")  # remove CpGs with no gene
+
+cpg2gene_epic <- cpg2gene_epic %>%
+  tidyr::separate_rows(UCSC_RefGene_Name, sep = ";") %>%
+  dplyr::filter(UCSC_RefGene_Name != "") 
+
+
+
+
+
+# Function to convert CpGs → gene symbols
+cpgs_to_genes <- function(cpg_list, mapping_df) {
+  mapping_df %>%
+    dplyr::filter(Name %in% cpg_list) %>%
+    pull(UCSC_RefGene_Name) %>%
+    unique()
+}
+
+werner_noint_map <- names(werner_noint)[1:200]
+ncs_noint_map <- names(ncs_noint_jacked_all)[1:200]
+progeria_noint_map <- names(progeria_noint)[1:200]
+
+genes_progeria_hypo <- cpgs_to_genes(progeria_hypo, cpg2gene_epic)
+genes_ncs_hypo <- cpgs_to_genes(ncs_hypo, cpg2gene_450k)
+genes_werner_hypo <- cpgs_to_genes(werner_hypo, cpg2gene_epic)
+
+
+
+
+library(GenomicRanges)
+
+
+get_genes <- function(symbols, disease_name) {
+  gr <- toGRanges(
+    getBM(
+      attributes = c("chromosome_name", "start_position", "end_position", "hgnc_symbol"),
+      filters = "hgnc_symbol",
+      values = symbols,
+      mart = ensembl
+    )
+  )
+  gr$disease <- disease_name
+  return(gr)
+}
+
+genes_progeria_hypo_gr <- get_genes(genes_progeria_hypo, "HGPS")
+genes_ncs_hypo_gr <- get_genes(genes_ncs_hypo, "NCS")
+genes_werner_hypo_gr <- get_genes(genes_werner_hypo, "Werner")
+
+genes <- c(genes_progeria_int_hyper_gr, genes_ncs_int_hyper_gr, genes_werner_int_hyper_gr)
+genes <- c(genes_progeria_hyper_gr, genes_ncs_hyper_gr, genes_werner_hyper_gr)
+genes <- c(genes_werner_hyper_gr, genes_ncs_hype_gr, genes_werner_noint_hypo_gr)
+genes <- c(genes_werner_hypo_gr)
+seqlevelsStyle(genes) <- "UCSC"
+
+
+disease_colors <- c(
+  "Werner" = "slateblue3",
+  "HGPS" = "steelblue3",
+  "NCS" = "#60BD68"
+)
+
+disease_colors <- c(
+  "NCS and HGPS" = "steelblue3"
+)
+
+library(karyoploteR)
+
+ensembl <- useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl")
+
+dev.off()
+
+pdf("karyoteR_hypermethylated_chr5.pdf", width = 4, height = 4, pointsize = 6)
+par(mar = c(4,0,4,1),
+    oma = c(0,4,0,0),
+    tck = -0.02,
+    mgp = c(2,0.5,0))
+
+kp <- plotKaryotype(genome="hg19", chromosomes="chr8")
+kpPlotMarkers(kp, data=genes, labels=genes$hgnc_symbol)
+
+# jittered vertical position
+
+kpPlotRegions(
+  kp,
+  data = genes,
+  col = disease_colors
+)
+
+
+legend(
+  x      = "bottomright",
+  legend = names(disease_colors),
+  text.width = strwidth(names(disease_colors)),
+  col    = disease_colors,
+  pch    = 19,
+  bty    = 'n',
+  inset  = c(0.4, 0),
+  xpd    = NA,
+  horiz  = TRUE
+)
+
+dev.off()
+
+
+
+
+
+kpPoints(kp,
+         data = genes[genes$group == "NCS", ],
+         col  = disease_colors["NCS"],
+         pch  = 16,
+         cex  = 0.5,
+         r0   = 0.1,
+         r1   = 0.3)
+
+kpPoints(kp,
+         data = genes[genes$group == "HGPS", ],
+         col  = disease_colors["HGPS"],
+         pch  = 16,
+         cex  = 0.5,
+         r0   = 0.4,
+         r1   = 0.6)
+
+kpPoints(kp,
+         data = genes[genes$group == "Werner", ],
+         col  = disease_colors["Werner"],
+         pch  = 16,
+         cex  = 0.5,
+         r0   = 0.7,
+         r1   = 0.9)
+
+
+invisible(dev.off())
+
+
+
+
+library(missMethyl)
+library(dplyr)
+library(ggplot2)
+
+# -------------------------
+# 1. Subset methylation matrix to CpGs in ncs_int_jacked
+# -------------------------
+
+int_ncs_mean <- data_ncs_noSNP[ncs_int_jacked$cg, ]
+
+noint_werner_mean <- data_werner_noSNP[names(werner_noint), ]
+
+int_progeria_mean <- data_progeria_noSNP[rownames(res_progeria_2),]
+
+ncs_jacked <- intersect(ncs_noint_jacked$cg, ncs_int_jacked$cg)
+
+ncs_noint_hypo <- ncs_noint_jacked %>%
+  dplyr::filter(pvalue_jack <= 0.05) %>%
+  arrange(pvalue_jack) %>%
+  dplyr::filter(delta_beta<0)
+
+ncs_noint_hypo <- head(ncs_noint_hypo$cg, 500)
+
+ncs_noint_hyper <- ncs_noint_jacked %>%
+  dplyr::filter(pvalue_jack <= 0.05) %>%
+  arrange(pvalue_jack) %>%
+  dplyr::filter(delta_beta>0)
+
+ncs_noint_hyper <- head(ncs_noint_hyper$cg, 500)
+
+ncs_int_hypo <- ncs_int_jacked %>%
+  dplyr::filter(pvalue_jack <= 0.05) %>%
+  arrange(pvalue_jack) %>%
+  dplyr::filter(delta_beta<0)
+
+ncs_int_hypo <- head(ncs_int_hypo$cg, 492)
+
+ncs_int_hyper <- ncs_int_jacked %>%
+  dplyr::filter(pvalue_jack <= 0.05) %>%
+  arrange(pvalue_jack) %>%
+  dplyr::filter(delta_beta>0)
+
+ncs_int_hyper <- head(ncs_int_hyper$cg, 500)
+
+
+ncs_hypo <- ncs_noint_hypo
+ncs_hypo <- c(ncs_hypo, ncs_int_hypo)
+ncs_hypo <- unique(ncs_hypo)
+length(ncs_hypo)
+
+ncs_hyper <- ncs_noint_hyper
+ncs_hyper <- c(ncs_hyper, ncs_int_hyper)
+ncs_hyper <- unique(ncs_hyper)
+
+
+
+
+
+
+werner_noint_hypo <- werner_noint_res %>%
+  dplyr::filter(pvalue <= 0.05) %>%
+  arrange(pvalue) %>%
+  dplyr::filter(delta_beta<0)
+
+werner_noint_hypo_all <- rownames(werner_noint_hypo)
+werner_noint_hypo <- head(rownames(werner_noint_hypo), 1000)
+
+werner_noint_hyper <- werner_noint_res %>%
+  dplyr::filter(pvalue <= 0.05) %>%
+  arrange(pvalue) %>%
+  dplyr::filter(delta_beta>0)
+
+werner_noint_hyper_all <- rownames(werner_noint_hyper)
+werner_noint_hyper <- head(rownames(werner_noint_hyper), 1000)
+
+
+werner_int_hypo <- werner_int_res %>%
+  dplyr::filter(pvalue <= 0.05) %>%
+  arrange(pvalue) %>%
+  dplyr::filter(delta_beta<0)
+werner_int_hypo_all <- rownames(werner_int_hypo)
+werner_int_hypo <- head(rownames(werner_int_hypo), 1000)
+
+werner_int_hyper <- werner_int_res %>%
+  dplyr::filter(pvalue <= 0.05) %>%
+  arrange(pvalue) %>%
+  dplyr::filter(delta_beta>0)
+werner_int_hyper <- rownames(werner_int_hyper)
+werner_int_hyper <- head(rownames(werner_int_hyper), 1000)
+
+werner_hypo_all <- werner_noint_hypo_all
+werner_hypo_all <- c(werner_hypo_all, werner_int_hypo_all)
+werner_hypo_all <- unique(werner_hypo_all)
+length(werner_hypo)
+
+werner_hyper <- werner_noint_hyper
+werner_hyper <- c(werner_hyper, werner_int_hyper)
+werner_hyper <- unique(werner_hyper)
+length(werner_hyper)
+
+
+
+
+
+progeria_noint_hypo <- progeria_noint_res %>%
+  dplyr::filter(pvalue <= 0.05) %>%
+  arrange(pvalue) %>%
+  dplyr::filter(delta_beta<0)
+
+progeria_noint_hypo <- head(rownames(progeria_noint_hypo), 1000)
+
+progeria_noint_hyper <- progeria_noint_res %>%
+  dplyr::filter(pvalue <= 0.05) %>%
+  arrange(pvalue) %>%
+  dplyr::filter(delta_beta>0)
+
+progeria_noint_hyper <- head(rownames(progeria_noint_hyper), 1000)
+
+
+progeria_int_hypo <- progeria_int_res %>%
+  dplyr::filter(pvalue <= 0.05) %>%
+  arrange(pvalue) %>%
+  dplyr::filter(delta_beta<0)
+
+progeria_int_hypo <- head(rownames(progeria_int_hypo), 1000)
+
+progeria_int_hyper <- progeria_int_res %>%
+  dplyr::filter(pvalue <= 0.05) %>%
+  arrange(pvalue) %>%
+  dplyr::filter(delta_beta>0)
+
+progeria_int_hyper <- head(rownames(progeria_int_hyper), 1000)
+
+progeria_hypo <- progeria_noint_hypo
+progeria_hypo <- c(progeria_hypo, progeria_int_hypo)
+progeria_hypo <- unique(progeria_hypo)
+length(progeria_hypo)
+
+progeria_hyper <- progeria_noint_hyper
+progeria_hyper <- c(progeria_hyper, progeria_int_hyper)
+progeria_hyper <- unique(progeria_hyper)
+length(progeria_hyper)
+
+progeria_all <- progeria_hypo
+progeria_all <- c(progeria_hypo)
+
+# -------------------------
+# 2. Split samples by group
+# -------------------------
+control_samples <- colnames(data_progeria_noSNP)[data_progeria_noSNP$diagnosis == "control HGPS"]
+disease_samples <- colnames(data_progeria_noSNP)[data_progeria_noSNP$diagnosis == "HGPS"]
+
+control_samples <- colnames(data_ncs_noSNP)[data_ncs_noSNP$diagnosis == "control NCS"]
+disease_samples <- colnames(data_ncs_noSNP)[data_ncs_noSNP$diagnosis == "NCS"]
+
+
+control_samples <- colnames(data_werner_noSNP)[data_werner_noSNP$diagnosis == "control Werner"]
+disease_samples <- colnames(data_werner_noSNP)[data_werner_noSNP$diagnosis == "Werner"]
+
+
+int_ncs_control <- int_ncs_mean[, control_samples]
+int_ncs_disease <- int_ncs_mean[, disease_samples]
+
+int_progeria_control <- int_progeria_mean[, control_samples]
+int_progeria_disease <- int_progeria_mean[, disease_samples]
+
+noint_werner_control <- noint_werner_mean[, control_samples]
+noint_werner_disease <- noint_werner_mean[, disease_samples]
+# -------------------------
+# 3. Compute CpG-wise means
+# -------------------------
+mean_control <- rowMeans(noint_werner_control, na.rm = TRUE)
+mean_disease <- rowMeans(noint_werner_disease, na.rm = TRUE)
+
+# Compute delta beta (disease - control)
+delta_beta <- mean_disease - mean_control
+
+# -------------------------
+# 4. Add delta_beta to ncs_int_jacked
+# -------------------------
+
+progeria_int_res <- res_progeria_2
+progeria_int_res$delta_beta <- delta_beta[rownames(progeria_int_res)]
+
+ncs_int_jacked$delta_beta <- delta_beta[ncs_int_jacked$cg]
+
+werner_noint_res <- res_werner_1
+werner_noint_res$delta_beta <- delta_beta[rownames(werner_noint_res)]
+
+
+names(werner_int_beta_vals) <- werner_int_all
+werner_int_beta_vals <- delta_beta[werner_int_all]
+
+# -------------------------
+# 5. Define up- and down-regulated CpGs
+# -------------------------
+ncs_noint_upregulated <- ncs_noint_jacked$cg[ncs_noint_jacked$delta_beta > 0]
+ncs_noint_downregulated   <- ncs_noint_jacked$cg[ncs_noint_jacked$delta_beta < 0]
+
+werner_int_hypo <- names(delta_beta)[delta_beta <0]
+werner_int_hyper <- names(delta_beta)[delta_beta >0]
+# -------------------------
+# 6. Rank CpGs by p-value and select top 100
+# -------------------------
+# Downregulated
+df_down_werner_int_hypo <- werner_int_hypo %>%
+  filter(cg %in% names(werner_all_int)) %>%
+  arrange(pvalue_jack)
+
+werner_int_downregulated_top100 <- head(df_down_ncs_int$cg, 300)
+ncs_noint_top100 <- ncs_int_jacked %>%
+  arrange(pvalue_jack)
+# Upregulated
+df_up_ncs_noint <- ncs_noint_jacked %>% 
+  filter(cg %in% ncs_noint_upregulated) %>%
+  arrange(pvalue_jack)
+
+werner_int_hypo_top100 <- head(werner_int_hypo, 100)
+werner_int_hyper_top100 <- head(werner_int_hyper, 100)
+
+werner_int_top <- werner_int_hypo_top100
+werner_int_top <- c(werner_int_top, werner_int_hyper_top100)
+werner_int_top <- unique(werner_int_top)
+# -------------------------
+# 7. Run gometh() for downregulated CpGs
+# -------------------------
+go_ncs_int_hyper <- gometh(
+  sig.cpg = ncs_int_hyper,
+  all.cpg = rownames(data_progeria_noSNP),
+  collection = "GO"
+)
+
+go_df_werner_noint_up <- as.data.frame(go_werner_noint_up)
+
+go_df_ncs_jacked <- as.data.frame(go_ncs_jacked)
+
+go_df_werner_noint_all <- as.data.frame(go_werner_noint)
+
+# -------------------------
+# 8. Plot top 10 Molecular Function GO terms
+# -------------------------
+top_go <- go_ncs_int_hyper %>%
+  dplyr::filter(ONTOLOGY == "CC") %>%
+  arrange(FDR) %>%
+  slice_head(n = 10)
+
+#pdf("Top_GO_BP_ncs_noint_hyper.pdf", width = 9, height = 6)
+ggplot(top_go, aes(x = reorder(TERM, -log10(FDR)), y = -log10(FDR))) +
+  geom_col(fill = "steelblue3") +
+  coord_flip() +
+  geom_hline(yintercept = 1.3, color = "red", linetype = "dashed", size = 1) +  # vertical line in flipped plot
+  labs(
+    x = "",
+    y = "-log10(FDR)",
+    title = "Biological process GO - HGPS hypomethylated genes from static models"
+  ) +
+  theme_bw() +
+  theme(
+    plot.title = element_text(
+      hjust = 1,
+      margin = margin(b = 10)
+    )
+  )
+
+dev.off()
+
+
+
+
+
+# "#60BD68"
+# "steelblue3", "slateblue3"
+# -------------------------
+# 9. Optional sanity checks
+# -------------------------
+stopifnot(length(ncs_int_downregulated_top100) > 0)
+stopifnot(all(ncs_int_downregulated_top100 %in% rownames(data_ncs_jacked_noSNP)))
