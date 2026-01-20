@@ -6,10 +6,6 @@ devtools::install_github("karoliskoncevicius/annmatrix@dev")
 library(remotes)
 install_github("karoliskoncevicius/matrixTests@dev_lm", force = TRUE)
 
-# necituoti
-devtools::install_local("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/epiclocks_0.1.3/epiclocks/")
-library(epiclocks)
-
 install.packages("annmatrix")
 library(annmatrix)
 
@@ -32,52 +28,21 @@ library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
 library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
 
 
-#calcPhenoAge(exampleBetas, examplePheno, imputation = F)
 
-#calcPhenoAge(exampleBetas, imputation = F)
+# df is annmatrix with methylation and sample data
 
-#calcSystemsAge(exampleBetas, examplePheno)
+dfPheno <- data.frame(Sample_ID = df$id,
+                            gender = df$sex,
+                            Age = df$age,
+                            group = df$diagnosis,
+                            Female = df$sex)
 
-#head(t(exampleBetas))
-#View(exampleBetas)
-#View(examplePheno)
+dfPheno$group <- ifelse(dfPheno$group == "control", 0, 1)
+dfPheno$Female <- ifelse(dfPheno$Female == "M", 0, 1)
 
-RData <- get_methylCIPHER_path()
-
-# 61 CpGs
-cpg_list <- read.table("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/acel13555-sup-0001-tables1.csv",
-                       quote = "",
-                       row.names = NULL,
-                       sep = ",")[,2][-1]
-
-# HGPS
-
-data_progeria <- data_progeria_classic
-
-data_progeria <- readRDS("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/GSE182991_annmatrix.rds")
-
-data_progeria_classic <- data_progeria_classic[, data_progeria_classic$diagnosis != "non-classical progeroid laminopathies"]
-
-data_progeria$diagnosis[data_progeria$diagnosis!="control"] <- "HGPS"
-data_progeria$diagnosis[data_progeria$diagnosis=="control"] <- "control HGPS"
-
-
-data_progeria <- data_progeria[, data_progeria$age < 39]
-
-progeriaPheno <- data.frame(Sample_ID = data_progeria$id,
-                            gender = data_progeria$sex,
-                            Age = data_progeria$age,
-                            group = data_progeria$diagnosis,
-                            Female = data_progeria$sex)
-
-progeriaPheno$group <- ifelse(progeriaPheno$group == "control", 0, 1)
-progeriaPheno$Female <- ifelse(progeriaPheno$Female == "M", 0, 1)
-
-telomereClocks <- ("calcDNAmTL")
-userClocks <- c("calcAdaptAge", "calcBocklandt", "calcDunedinPoAm38", "calcHannum", "calcHorvath2",
-                "calcLeeRobust", "calcWeidner", "calcZhang2019", "calcEpiTOC", "calcGaragnani",
-                "calcHorvath1", "calcHRSInChPhenoAge","calcLeeRefinedRobust", "calcLin", "calcPhenoAge",
-                "calcVidalBralo", "calcZhang", "calcCausAge", "calcDamAge", "calcEpiTOC2", "calcDNAmTL")
+userClocks <- c("calcAdaptAge", "calcDunedinPoAm38", "calcHannum", "calcHorvath2",
+                "calcZhang2019", "calcEpiTOC", "calcHorvath1",  "calcPhenoAge",
+                "calcZhang",  "calcDamAge", "calcDNAmTL")
 
 clock_list <- c("Sample_ID", "gender", "Age", "group", "data_pckg", "DamAge", "AdaptAge", "CausAge", "PhenoAge",
                 "DunedinPoAm38", "Hannum", "Horvath1", "Horvath2", "Zhang",
