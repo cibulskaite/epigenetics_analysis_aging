@@ -230,20 +230,14 @@ disease_cols <- c(
   Werner = "slateblue3"
 )
 
-# Clock order
 clocks <- unique(sig_clocks$Clock_names)
 ys <- seq_along(clocks)
 names(ys) <- clocks
 
-# X limits
 xlim <- range(sig_clocks$MedianDiff, na.rm = TRUE)
 x_pad <- diff(xlim) * 0.1
 xlim <- c(xlim[1] - x_pad, xlim[2] + x_pad)
 
-sig_clocks_all <- sig_clocks
-#sig_clocks <- sig_clocks[sig_clocks$Clock_names != "epiTOC2", ]
-
-# Set up plot
 plot.new()
 plot.window(
   xlim = xlim,
@@ -252,7 +246,6 @@ plot.window(
 
 abline(v = 0, col = "grey", lty = 2)
 
-# Horizontal grid lines
 for (y in ys) {
   segments(
     x0 = xlim[1],
@@ -264,22 +257,8 @@ for (y in ys) {
     lwd = 1
   )
 }
-'
-# --- Non-significant points (EMPTY) ---
-for (i in seq_len(nrow(nonsig_df))) {
-  row <- nonsig_df[i, ]
-  
-  points(
-    x = row$MedianDiff,
-    y = ys[as.character(row$Clock_names)] +
-      runif(1, -0.15, 0.15),
-    col = disease_cols[row$Disease],
-    pch = 1,     # open circle
-    cex = 1.8
-  )
-}
-'
-# --- Significant points (FILLED) ---
+
+
 for (i in seq_len(nrow(sig_df))) {
   row <- sig_df[i, ]
   
@@ -293,7 +272,7 @@ for (i in seq_len(nrow(sig_df))) {
   )
 }
 
-# Axes
+
 ticks <- seq(-5, 320, by = 5)
 axis(1, at = ticks, cex.axis = 0.7)
 axis(2, at = ys, labels = clocks, las = 2, cex.axis = 0.45)
@@ -306,7 +285,6 @@ title(
   cex.lab  = 0.8
 )
 
-# Legend
 par(xpd = TRUE)
 
 legend(
