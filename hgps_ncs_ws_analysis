@@ -315,51 +315,41 @@ dev.off()
 
 # remove SNPs
 
-info_snps_EPIC <- read.table("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/SNPs/EPIC.hg38.mask.tsv",
-                   quote = "",
-                   row.names = NULL,
-                   header = TRUE,
-                   sep = "\t")
+# info_snps_EPIC holds information on EPIC array SNPs
+# info_snps_HM45 hold information on HM450 array SNPs
+
 
 snps_EPIC <- info_snps_EPIC$probeID[info_snps_EPIC$MASK_general == "TRUE"]
 
-data_progeria_noSNP <- data_progeria[!rownames(data_progeria) %in% snps_EPIC, ]
+df_progeria_noSNP <- df_progeria[!rownames(df_progeria) %in% snps_EPIC, ]
 
-data_progeria_noSNP_filtered <- data_progeria_noSNP[, data_progeria_noSNP$age < 39]
+df_werner_noSNP <- df_werner[!rownames(df_werner) %in% snps_EPIC, ]
 
-
-data_werner_noSNP <- data_werner[!rownames(data_werner) %in% snps_EPIC, ]
-
-info_snps_HM450 <- read.table("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/SNPs/HM450.hg38.mask.tsv",
-                         quote = "",
-                         row.names = NULL,
-                         header = TRUE,
-                         sep = "\t")
 
 snps_HM450 <- info_snps_HM450$probeID[info_snps_HM450$MASK_general == "TRUE"]
 
-data_ncs_noSNP <- data_ncs[!rownames(data_ncs) %in% snps_HM450, ]
+df_ncs_noSNP <- df_ncs[!rownames(data_ncs) %in% snps_HM450, ]
 
 
 
 # JACK KNIFE FOR NCS DATA
-cgs <- rownames(data_ncs_jacked_noSNP_all)
+cgs <- rownames(df_ncs_jacked_noSNP_all)
 
-samples <- colnames(data_ncs_jacked_noSNP[,data_ncs_jacked_noSNP$diagnosis == "ncs"])
+samples <- colnames(df_ncs_jacked_noSNP[,df_ncs_jacked_noSNP$diagnosis == "ncs"])
 
-mod0 <- model.matrix(~ data_ncs_jacked_noSNP$age)
-mod1 <- model.matrix(~ data_ncs_jacked_noSNP$age + data_ncs_jacked_noSNP$diagnosis)
+mod0 <- model.matrix(~ df_ncs_jacked_noSNP$age)
+mod1 <- model.matrix(~ df_ncs_jacked_noSNP$age + df_ncs_jacked_noSNP$diagnosis)
 
 res_ncs_2_jacked <- data.frame(cg = character(0),
                                pvalue = numeric(0))
 
-n_samples <- ncol(data_ncs_jacked_noSNP_all)
+n_samples <- ncol(df_ncs_jacked_noSNP_all)
 
 pvals_jack <- matrix(
   NA_real_,
-  nrow = nrow(data_ncs_jacked_noSNP_all),
+  nrow = nrow(df_ncs_jacked_noSNP_all),
   ncol = n_samples,
-  dimnames = list(rownames(data_ncs_jacked_noSNP_all), colnames(data_ncs_jacked_noSNP_all))
+  dimnames = list(rownames(df_ncs_jacked_noSNP_all), colnames(df_ncs_jacked_noSNP_all))
 )
 
 for (i in seq_len(n_samples)) {
@@ -384,414 +374,76 @@ pval_max <- res_ncs_1_jacked$pvalue
 pval_max_fdr <- p.adjust(pval_max, "fdr")
 
 res_ncs_1_jacked_fdr <- data.frame(
-  cg = rownames(data_ncs_jacked_noSNP_all),
+  cg = rownames(df_ncs_jacked_noSNP_all),
   pvalue_jack = pval_max,
   pvalue_jack_fdr = pval_max_fdr
 )
 
-#res_ncs_1_jacked_fdr
-#res_ncs_2_jacked_fdr
-#res_ncs_2_jacked_fdr_alldata
 
-i <- which(res_ncs_1_jacked_fdr$pvalue_jack <= 0.05)
-ncs_noint_jacked <- res_ncs_1_jacked_fdr[i,]
-j <- order(res_ncs_1_jacked_fdr$pvalue_jack)[1:10]
-ncs_noint_jacked_top10 <- res_ncs_1_jacked_fdr[j,]
 
-k <- which(res_ncs_2_jacked_fdr$pvalue_jack <= 0.05)
-ncs_int_jacked <- res_ncs_2_jacked_fdr[k,]
-l <- order(res_ncs_2_jacked_fdr$pvalue_jack)[1:10]
-ncs_int_jacked_top10 <- res_ncs_2_jacked_fdr[l,]
 
+# df_noSNP is methylation data from one disease without SNPs
 
-# find DMCs in progeria
 
-mod0 <- model.matrix(~ data_progeria_noSNP$age)
-mod1 <- model.matrix(~ data_progeria_noSNP$age + data_progeria_noSNP$diagnosis)
+# find DMCs with static differences - no interaction
 
-res_progeria_1 <- row_lm_f(data_progeria_noSNP, mod1, mod0)
+mod0 <- model.matrix(~ df_noSNP$age)
+mod1 <- model.matrix(~ df_noSNP$age + df_noSNP$diagnosis)
 
-i <- which(res_progeria_1$pvalue <= 0.05)
-i <- order(res_progeria_1$pvalue)[1:5] # 56552 cpgs
-length(i)
+res_noint <- row_lm_f(df_noSNP, mod1, mod0)
 
-progeria_noint <- res_progeria_1$pvalue[i]
-names(progeria_noint) <- rownames(res_progeria_1)[i]
-progeria_noint <- progeria_noint[order(progeria_noint)]
 
+i <- order(res_noint$pvalue)[1:5]
 
-fdr_progeria_1 <- p.adjust(res_progeria_1$pvalue, "fdr") <= 0.05
-sum(fdr_progeria_1) # 0
+cpgs_noint <- res_noint$pvalue[i]
+names(cpgs_noint) <- rownames(res_noint)[i]
+cpgs_noint <- cpgs_noint[order(cpgs_noint)]
 
-progeria_noint_fdr_all <- rownames(data_progeria_noSNP)[fdr_progeria_1]
 
-bonf_progeria <- p.adjust(res_progeria_1$pvalue, "bonf") <= 0.05
-sum(bonf_progeria) #10
+j <- p.adjust(res_noint$pvalue, "fdr") <= 0.05
 
-lapply(cpgs_progeria_noint, function(cpg) {
-  png(filename = paste0("progeria_nosnps_noint_all_", cpg, ".png"),
-      width = 6, height = 6, units = "in", res = 300)
-  
-  plot(data_progeria$age, data_progeria[cpg, ],
-       col = lab2col(data_progeria$diagnosis),
-       pch = 19,
-       main = cpg)
-  
-  dev.off()
-})
+cpgs_noint_fdr <- res_noint$pvalue[j]
+names(cpgs_noint_fdr) <- rownames(res_noint)[j]
+cpgs_noint_fdr <- cpgs_noint_fdr[order(cpgs_noint_fdr)[j]
 
 
+# find DMCs with dynamic differences - interaction
 
+mod0 <- model.matrix(~ df_noSNP$age + df_noSNP$diagnosis)
+mod1 <- model.matrix(~ df_noSNP$age + df_noSNP$diagnosis + df_noSNP$age:df_noSNP$diagnosis)
 
-# use the filtered 61 CpGs
-#list_cpg_progeria <- which(rownames(data_progeria)[i] %in% cpg_list)
+res_int <- row_lm_f(df_noSNP, mod1, mod0)
 
-#data_progeria <- data_progeria[list_cpg_progeria,]
+k <- order(res_int$pvalue)[1:5]
 
-# find DMCs in progeria - interaction
+cpgs_int <- res_int$pvalue[k]
+names(cpgs_int) <- rownames(res_int)[k]
+cpgs_int <- cpgs_int[order(cpgs_int)]
 
-mod0 <- model.matrix(~ data_progeria_noSNP$age + data_progeria_noSNP$diagnosis)
-mod1 <- model.matrix(~ data_progeria_noSNP$age + data_progeria_noSNP$diagnosis + data_progeria_noSNP$age:data_progeria_noSNP$diagnosis)
 
-res_progeria_2 <- row_lm_f(data_progeria_noSNP, mod1, mod0)
+l <- p.adjust(res_int$pvalue, "fdr") <= 0.05
 
-j <- which(res_progeria_2$pvalue <= 0.05)
-j <- order(res_progeria_2$pvalue)[1:5] #41249
-length(j)
-
-progeria_int <- res_progeria_2$pvalue[j]
-names(progeria_int) <- rownames(res_progeria_2)[j]
-progeria_int <- progeria_int[order(progeria_int)]
-
-progeria_int_all <- res_progeria_2$pvalue[j]
-names(progeria_int_all) <- rownames(res_progeria_2)[j]
-i <- which(names(progeria_int_all) %in% int_jacked_all)
-progeria_int_from_all <- progeria_int_all[i]
-progeria_int_from_all <- progeria_int_from_all[order(progeria_int_from_all)]
-
-
-fdr_progeria_2 <- p.adjust(res_progeria_2$pvalue, "fdr") <= 0.05
-sum(fdr_progeria_2) # 2629
-k <- order(fdr_progeria_2)[1:10]
-
-progeria_int_fdr_top10 <- fdr_progeria_2[k]
-names(progeria_int_fdr_top10) <- rownames(data_progeria_noSNP)[k]
-progeria_int_fdr_top10 <- progeria_int_fdr_top10[order(progeria_int_fdr_top10)]
-
-i <- which(rownames(data_progeria_noSNP) %in% common_ncsprogeria_int_fdr)
-progeria_int_fdr_from_ncs <- fdr_progeria_2[i]
-names(progeria_int_fdr_from_ncs) <- rownames(data_progeria_noSNP)[i]
-progeria_int_fdr_from_ncs<- 
-  progeria_int_fdr_from_ncs[order(progeria_int_fdr_from_ncs)]
-
-bonf_progeria_2 <- p.adjust(res_progeria_2$pvalue, "bonf") <= 0.05
-sum(bonf_progeria_2) #47
-
-# cpgs_progeria_2_classic - interaction, classic progeria
-# cpgs_progeria_2_all - interaction, all cases
-
-cols <- ifelse(data_progeria_noSNP$diagnosis == "control", "blue", "red")
-
-# plotting
-
-lapply(cpgs_progeria_2, function(cpg) {
-  png(filename = paste0("progeria_nosnps_int_classic_", cpg, ".png"),
-      width = 6, height = 6, units = "in", res = 300)
-  
-  plot(data_progeria_noSNP$age, data_progeria_noSNP[cpg, ],
-       col = cols,
-       pch = 19,
-       main = cpg)
-
-  legend("topright",
-         legend = c("control", "hgps"),
-         col = c("blue", "red"),
-         pch = 19,
-         bty = "n")  
-    
-  dev.off()
-})
-
-# find using filtered 61 CpGs
-list_cpg_progeria <- which(rownames(data_progeria)[fdr_progeria_2] %in% cpg_list)
-
-data_progeria <- data_progeria[list_cpg_progeria,]
-
-
-# find DMCs in Werner
-# no interaction - static
-
-mod0 <- model.matrix(~ data_werner_noSNP$age)
-mod1 <- model.matrix(~ data_werner_noSNP$age + data_werner_noSNP$diagnosis)
-
-res_werner_1 <- row_lm_f(data_werner_noSNP, mod1, mod0)
-
-m <- which(res_werner_1$pvalue <= 0.05)
-length(m)
-
-
-fdr_werner_1 <- p.adjust(res_werner_1$pvalue, "fdr")
-sum(fdr_werner_1)
-res_werner_1$pval_adj <- fdr_werner_1
-res_werner_1 <- res_werner_1[order(res_werner_1$pval_adj),]
-
-i <- which(res_werner_1$pval_adj <= 0.05)
-werner_noint_fdr <- res_werner_1$pval_adj[i]
-names(werner_noint_fdr) <- rownames(res_werner_1)[i]
-werner_noint_fdr <- werner_noint_fdr[order(werner_noint_fdr)]
-
-
-j <- which(res_werner_1$pvalue <= 0.05)
-werner_noint <- res_werner_1$pvalue[j]
-names(werner_noint) <- rownames(res_werner_1)[j]
-werner_noint <- werner_noint[order(werner_noint)]
-
-
-bonf_werner_1 <- p.adjust(res_werner_1$pvalue, "bonf") <= 0.05
-sum(bonf_werner_1)
-
-
-
-
-# find DMCs in Werner - interaction
-
-mod0 <- model.matrix(~ data_werner_noSNP$age + data_werner_noSNP$diagnosis)
-mod1 <- model.matrix(~ data_werner_noSNP$age + data_werner_noSNP$diagnosis + data_werner_noSNP$age:data_werner_noSNP$diagnosis)
-
-res_werner_2 <- row_lm_f(data_werner_noSNP, mod1, mod0)
-
-n <- which(res_werner_2$pvalue <= 0.05)
-n <- order(res_werner_2$pvalue)
-length(n)
-
-werner_int <- res_werner_2$pvalue[n]
-names(werner_int) <- rownames(res_werner_2)[n]
-werner_int <- werner_int[order(werner_int)]
-
-fdr_werner_2 <- p.adjust(res_werner_2$pvalue, "fdr") <=0.05
-sum(fdr_werner_2)
-
-
-
-bonf_werner_2 <- p.adjust(res_werner_2$pvalue, "bonf") <= 0.05
-sum(bonf_werner_2)
-
-
-lapply(cpgs_werner_2, function(cpg) {
-  png(filename = paste0("werner_filtered_int_all_", cpg, ".png"),
-      width = 6, height = 6, units = "in", res = 300)
-  
-  plot(data_werner$age, data_werner[cpg, ],
-       col = lab2col(data_werner$diagnosis),
-       pch = 19,
-       main = cpg)
-  
-  dev.off()
-})
-
-
-# cpgs_werner_1_classic - no interaction, classic
-# cpgs_werner_1_all - no interaction, all cases
-common_ws <- cpgs_werner_1_all %in% cpgs_werner_1_classic
-
-
-# find DMCs in NCS
-#no interaction - static
-
-mod0 <- model.matrix(~ data_ncs_noSNP$age)
-mod1 <- model.matrix(~ data_ncs_noSNP$age + data_ncs_noSNP$diagnosis)
-
-res_ncs_1 <- row_lm_f(data_ncs_noSNP, mod1, mod0)
-
-k <- which(res_ncs_1$pvalue <= 0.05) #19368 sites
-k <- order(res_ncs_1$pvalue)[1:10]
-length(k)
-
-ncs_noint_all_top <- res_ncs_1[k,]
-ncs_noint_all <- res_ncs_1$pval[k]
-names(ncs_noint_all) <- rownames(res_ncs_1)[k]
-
-
-l <- which(names(ncs_noint_all) %in% noint_jacked_all)
-ncs_noint_from_all <- ncs_noint_all[l]
-
-ncs_noint_from_all <- ncs_noint_from_all[order(ncs_noint_from_all)]
-
-fdr_ncs_1 <- p.adjust(res_ncs_1$pvalue, "fdr") <=0.05
-i <- order(fdr_ncs_1)[1:10]
-sum(fdr_ncs_1) # 30
-
-# store DMCs
-ncs_noint_no30_top10 <- res_ncs_1[k,]
-ncs_noint_fdr_top10 <- fdr_ncs_1[i]
-names(ncs_noint_fdr_top10) <- rownames(data_ncs_noSNP)[i]
-ncs_noint_fdr_top10 <- ncs_noint_fdr_top10[order(ncs_noint_fdr_top10)]
-
-i <- which(rownames(data_ncs_noSNP) %in% common_ncswerner_noint_fdr)
-ncs_noint_fdr_fromwerner <- fdr_ncs_1[i]
-names(ncs_noint_fdr_fromwerner) <- rownames(data_ncs_noSNP)[i]
-ncs_noint_fdr_fromwerner <- ncs_noint_fdr_fromwerner[order(ncs_noint_fdr_fromwerner)]
-
-
-
-bonf_ncs_1 <- p.adjust(res_ncs_1$pvalue, "bonf") <= 0.05
-sum(bonf_ncs_1) # 9
-
-cols <- ifelse(data_ncs_classic_noSNP$diagnosis == "control", "blue", "red")
-
-lapply(cpgs_ncs_1, function(cpg) {
-  png(filename = paste0("ncs_noint_no20_", cpg, ".png"),
-      width = 6, height = 6, units = "in", res = 300)
-  
-  plot(data_ncs_classic_noSNP$age, data_ncs_classic_noSNP[cpg, ],
-       col = cols,
-       pch = 19,
-       main = cpg)
-  
-  legend("topright",
-         legend = c("control", "ncs"),
-         col = c("blue", "red"),
-         pch = 19,
-         bty = "n")
-  
-  dev.off()
-})
-
-# find DMCs in NCS - interaction
-
-data_ncs_noSNP_fil <- data_ncs_noSNP[data_ncs_noSNP]
-
-mod0 <- model.matrix(~ data_ncs_noSNP$age + data_ncs_noSNP$diagnosis)
-mod1 <- model.matrix(~ data_ncs_noSNP$age + data_ncs_noSNP$diagnosis + data_ncs_noSNP$age:data_ncs_noSNP$diagnosis)
-
-res_ncs_2 <- row_lm_f(data_ncs_noSNP, mod1, mod0)
-
-l <- which(res_ncs_2$pvalue <= 0.05) #29022 sites
-length(l)
-
-ncs_int_all <- rownames(data_ncs_noSNP)[l]
-
-fdr_ncs_2 <- p.adjust(res_ncs_2$pvalue, "fdr")
-sum(fdr_ncs_2) # 1543
-j <- order(fdr_ncs_2)[1:10]
-
-# store DMCs
-ncs_int_fdr_all <- rownames(data_ncs_noSNP)[fdr_ncs_2]
-ncs_int_fdr_top10 <- fdr_ncs_2[j]
-names(ncs_int_fdr_top10) <- rownames(data_ncs_noSNP)[j]
-ncs_int_fdr_top10 <- ncs_int_fdr_top10[order(ncs_int_fdr_top10)]
-
-i <- which(rownames(data_ncs_noSNP) %in% common_ncsprogeria_int_fdr)
-ncs_int_fdr_from_progeria <- fdr_ncs_2[i]
-names(ncs_int_fdr_from_progeria) <- rownames(data_ncs_noSNP)[i]
-ncs_int_fdr_from_progeria <- ncs_int_fdr_from_progeria[order(ncs_int_fdr_from_progeria)]
-
-
-bonf_ncs_2 <- p.adjust(res_ncs_2$pvalue, "bonf") <= 0.05
-sum(bonf_ncs_2) # 275
-
-cols <- ifelse(data_ncs$diagnosis == "control", "blue", "red")
-
-
-i <- which(rownames(data_ncs) %in% cpgs_progeria_2)
-
-lapply(cpgs_ncs_2, function(cpg) {
-  png(filename = paste0("ncs_all_from_hgps_", cpg, ".png"),
-      width = 6, height = 6, units = "in", res = 300)
-  
-  plot(data_ncs$age, data_ncs[cpg, ],
-       col = cols,
-       pch = 19,
-       main = cpg)
-
-  legend("topright",
-         legend = c("control", "ncs"),
-         col = c("blue", "red"),
-         pch = 19,
-         bty = "n")  
-    
-  dev.off()
-})
-
-
-common_int_ncs_progeria <- intersect(ncs_int_fdr, progeria_int_fdr)
-common_noint_ncs_werner <- intersect(ncs_noint_fdr, werner_noint_fdr)
-common_int_progeria_noint_werner <- intersect(progeria_int_fdr, werner_noint_fdr)
-
-common_all <- intersect(progeria_noint, ncs_noint)
-common_all <- intersect(common_all, werner_noint)
-common_all_noint <- common_all
-intersect()
-
-common_all_int <- intersect(progeria_int, ncs_int)
-common_all_int <- intersect(common_all_int, werner_int)
-cgs <- intersect(common_all_int, ncs_int_fdr)
-
-int_fdr <- c("cg13421038", "cg00461650", "cg06393098", "cg16358034", "cg16265348")
-noint_fdr <- c("cg10493186", "cg20902757", "cg09701700", "cg09092525", "cg02792617")
-
-
-common_ncs_int_fdr_fromall #5
-
-
-data_ncs_noSNP$diagnosis[data_ncs_noSNP$diagnosis=="control"] <- "control NCS"
-data_progeria_noSNP$diagnosis[data_progeria_noSNP$diagnosis=="control"] <- "control HGPS"
-data_werner_noSNP$diagnosis[data_werner_noSNP$diagnosis=="control"] <- "control Werner"
-
+cpgs_int_fdr <- res_int$pvalue[l]
+names(cpgs_int_fdr) <- rownames(res_int)[l]
+cpgs_int_fdr <- cpgs_int_fdr[order(cpgs_int_fdr)[l]
 
 
 
 # List of datasets and their disease labels
+
 datasets <- list(
-  "NCS"      = data_ncs_noSNP[,data_ncs_noSNP$diagnosis == "NCS"],
-  "control NCS" = data_ncs_noSNP[,data_ncs_noSNP$diagnosis == "control NCS"],
-  "HGPS" = data_progeria_noSNP[,data_progeria_noSNP$diagnosis == "HGPS"],
-  "control HGPS" = data_progeria_noSNP[,data_progeria_noSNP$diagnosis == "control HGPS"],
-  "Werner" = data_werner_noSNP[,data_werner_noSNP$diagnosis == "Werner"],
-  "control Werner" = data_werner_noSNP[,data_werner_noSNP$diagnosis == "control Werner"]
+  "NCS"      = df_ncs_noSNP[,df_ncs_noSNP$diagnosis == "NCS"],
+  "control NCS" = df_ncs_noSNP[,df_ncs_noSNP$diagnosis == "control NCS"],
+  "HGPS" = df_progeria_noSNP[,df_progeria_noSNP$diagnosis == "HGPS"],
+  "control HGPS" = df_progeria_noSNP[,df_progeria_noSNP$diagnosis == "control HGPS"],
+  "Werner" = df_werner_noSNP[,df_werner_noSNP$diagnosis == "Werner"],
+  "control Werner" = df_werner_noSNP[,df_werner_noSNP$diagnosis == "control Werner"]
 )
 
-datasets <- list(
-  "Werner" = data_werner_noSNP[,data_werner_noSNP$diagnosis == "Werner"],
-  "control Werner" = data_werner_noSNP[,data_werner_noSNP$diagnosis == "control Werner"])
 
+# Colors for disease
 
-
-
-
-'
-Čia pora spalvų pasiūlymų derinių
-"#FAA43A" ir "#DECF3F"
-"steelblue3" ir "deepskyblue" - progeria
-"#60BD68" ir "lightgreen" - ncs
-"mediumpurple1" ir "slateblue3" -werner
-'
-
-datasets <- list(
-  "controls" = controls,
-  "control NCS" = data_ncs_noSNP[,data_ncs_noSNP$diagnosis == "control NCS"],
-  "NCS"      = data_ncs_noSNP[,data_ncs_noSNP$diagnosis == "NCS"]
-  )
-
-# Colors for disease groups
 disease2col <- c(
-  "controls" = "lightgrey",
-  "control NCS" = "lightgreen",
-  "NCS" = "#60BD68"
-  )
-
-
-datasets_seq <- list(
-  "controls" = controls,
-  "control HGPS" = data_progeria_noSNP[,data_progeria_noSNP$diagnosis == "control HGPS"],
-  "HGPS" = data_progeria_noSNP[,data_progeria_noSNP$diagnosis == "HGPS"],
-  "control Werner" = data_werner_noSNP[,data_werner_noSNP$diagnosis == "control Werner"],
-  "Werner" = data_werner_noSNP[,data_werner_noSNP$diagnosis == "Werner"],
-  "control NCS" = data_ncs_noSNP[,data_ncs_noSNP$diagnosis == "control NCS"],
-  "NCS"      = data_ncs_noSNP[,data_ncs_noSNP$diagnosis == "NCS"]
-)
-
-disease2col_seq <- c(
   "controls" = "lightgrey",
   "control HGPS" = "deepskyblue",
   "HGPS" = "steelblue3",
