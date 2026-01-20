@@ -4,7 +4,7 @@ devtools::install_github("HigginsChenLab/methylCIPHER")
 devtools::install_github("karoliskoncevicius/annmatrix@dev")
 
 library(remotes)
-install_github("karoliskoncevicius/matrixTests@dev_lm", force = TRUE)
+install_github("karoliskoncevicius/matrixTests@dev_lm")
 
 install.packages("annmatrix")
 library(annmatrix)
@@ -95,63 +95,7 @@ clocks_data <- clocks_data %>%
 clock_names <- colnames(clocks_data)[6:26]
 
 
-
-# graph - y clock, x age
-'
-plot_clock <- function(df, clock_name) {
-
-  df$clock_name <- df[[clock_name]]
-  
-  df <- df %>%
-    group_by(data_pckg) %>%
-    mutate(residuals = residuals(lm(clock_name ~ Age))) %>%
-    ungroup()
-
-  p <- ggboxplot(df,
-                 x = "group",
-                 y = "residuals",
-                 color = "group",
-                 palette = "jco",
-                 facet.by = "data_pckg",
-                 add = "jitter",
-                 add.params = list(
-                   width = 0.2,
-                   alpha = 0.6,
-                   size = 1.5
-                 )) +
-                
-    stat_compare_means(method = "t.test") +
-    labs(title = paste0(clock_name),
-         x = "Group", y = "Residuals")
-  
-  return(p)
-}
-
-lapply(clock_names, function(clock) {
-  
-  p <- plot_clock(clocks_data, clock)
-  
-  ggsave(
-    filename = paste0("clock_residuals_boxplot_", clock, ".png"),
-    plot = p,
-    width = 10,
-    height = 6,
-    dpi = 300
-  )
-})
-'
-
-sig_clocks_pos <- data.frame(Clock_names = character(0),
-                         Disease = character(0),
-                         pvals = numeric(0),
-                         Median = numeric(0),
-                         stringsAsFactors = FALSE)
-
-sig_clocks_neg <- data.frame(Clock_names = character(0),
-                             Disease = character(0),
-                             pvals = numeric(0),
-                             Median = numeric(0),
-                             stringsAsFactors = FALSE)
+# sig_clocks - store all clock calculations of all diseases
 
 sig_clocks <- data.frame(Clock_names = character(0),
                          Disease = character(0),
@@ -161,32 +105,23 @@ sig_clocks <- data.frame(Clock_names = character(0),
                          stringsAsFactors = FALSE)
 
 
+# violin plots of clocks results
 plot_clock_violin <- function(df, clock_name) {
   
   df$clock_name <- df[[clock_name]]
   
-  #if (clock_name %in% telomere_clocks) {
-    # compute residuals
-    df <- df %>%
-      group_by(data_pckg) %>%
-      mutate(residuals = residuals(lm(clock_name ~ Age))) %>%
-      ungroup()
-  #} else {
-  #  df <- df %>%
-  #    group_by(data_pckg) %>%
-  #    mutate(residuals = clock_name - Age) %>%
-  #    ungroup()
-  #}
-  
+  df <- df %>%
+    group_by(data_pckg) %>%
+    mutate(residuals = residuals(lm(clock_name ~ Age))) %>%
+    ungroup()
   
   pkgs <- unique(df$data_pckg)
   
-  # 1. compute global y-limits across all data
   lim <- diff(range(df$residuals)) * 0.8
   global_ylim <- range(df$residuals) + c(0-lim, lim)
   
-  par(mfrow = c(1, length(pkgs)), mar = c(4, 2, 3, 1))  # smaller left margin
-  par(oma = c(4, 4, 0, 0))  # outer margins for common y-axis
+  par(mfrow = c(1, length(pkgs)), mar = c(4, 2, 3, 1))
+  par(oma = c(4, 4, 0, 0))
   
   for (pkg in pkgs) {
     
@@ -199,21 +134,19 @@ plot_clock_violin <- function(df, clock_name) {
     xs <- Map(getElement, dens, "y")
     ys <- Map(getElement, dens, "x")
     
-    # mirror densities
     xs <- Map(c, xs, Map(rev, Map(`*`, -1, xs)))
     ys <- Map(c, ys, Map(rev, ys))
     
-    # scale & position violins
     xs <- Map(function(x) (x - min(x)) / max(x - min(x)) * 0.4, xs)
     xs <- Map(`+`, xs, 1:length(xs))
     
     plot.new()
     plot.window(
       xlim = c(0.5, length(xs) + 0.5),
-      ylim = global_ylim  # use global y-limits!
+      ylim = global_ylim
     )
     
-    par(xpd = FALSE)  # ensure drawing is clipped to subplot
+    par(xpd = FALSE)
     grid(nx = NA, ny = NULL, lwd = 1.5)
     
     Map(polygon, xs, ys, col = cols)
@@ -239,38 +172,16 @@ plot_clock_violin <- function(df, clock_name) {
     } else {
       p_val <- summary(aov(residuals ~ group, data = sub))[[1]][["Pr(>F)"]][1]
     }
-    
-'
-    if (p_val <= 0.05) {
-      if (medians[["disease"]] > medians[["control"]]){
-          sig_clocks_pos <<- rbind(sig_clocks_pos, data.frame(Clock_names = clock_name,
-                                                          Disease = pkg,
-                                                          Median = medians[["disease"]],
-                                                          MedianDiff = medians[["disease"]] - medians[["control"]],
-                                                          pvals = p_val,
-                                                          stringsAsFactors = FALSE)
-                                   )
-        } else{
-          sig_clocks_neg <<- rbind(sig_clocks_neg, data.frame(Clock_names = clock_name,
-                                                          Disease = pkg,
-                                                          Median = medians[["disease"]],
-                                                          MedianDiff = medians[["disease"]] - medians[["control"]],
-                                                          pvals = p_val,
-                                                          stringsAsFactors = FALSE)
-                                   )
-        }
-    }
-'
-    
-    #if (p_val <= 0.05) {
-    sig_clocks <<- rbind(sig_clocks, data.frame(Clock_names = clock_name,
+
+
+   sig_clocks <<- rbind(sig_clocks, data.frame(Clock_names = clock_name,
                                                 Disease = pkg,
                                                 Median = medians[["disease"]],
                                                 MedianDiff = medians[["disease"]] - medians[["control"]],
                                                 pvals = p_val,
                                                 stringsAsFactors = FALSE)
-        )
-    #}
+                        )
+
 
     y_pos <- max(sub$residuals, na.rm = TRUE) + 0.1 * diff(global_ylim)
     text(x = 1.8, 
@@ -295,7 +206,6 @@ plot_clock_violin <- function(df, clock_name) {
 }
 
 
-plot_clock_violin(clocks_data, "AdaptAge")
 
 lapply(clock_names, function(clock) {
   
@@ -304,113 +214,16 @@ lapply(clock_names, function(clock) {
   
   plot_clock_violin(clocks_data, clock)
   
-  dev.off()  # close the file
+  dev.off()
 })
 
-n <- nrow(ncs_clocks)
-i <- nrow(progeria_clocks)
-j <- nrow(ws_clocks)
-
-color_map <- c(
-  "NCS control"      = "lightpink",
-  "NCS disease"       = "magenta4",
-  "Werner control"   = "darksalmon",
-  "Werner disease"    = "darkred",
-  "HGPS control" = "lightsteelblue3",
-  "HGPS disease"  = "royalblue4"
-)
-
-'''
-get_stats <- function(df, clock_name) {
-  
-  df %>%
-    mutate(clock_name = .data[[clock_name]]) %>%
-    group_by(disease_group) %>%
-    do({
-      fit <- lm(clock_name ~ Age, data = .)
-      tibble(
-        p_value = tidy(fit) %>% filter(term == "Age") %>% pull(p.value),
-        r2 = glance(fit)$r.squared
-      )
-    }) %>%
-    mutate(
-      label = paste0(
-        "R² = ", round(r2, 2),
-        "\n",
-        "p = ", signif(p_value, 3)
-      )
-    )
-}
-
-plot_scatter <- function(df, clock_name) {
-  
-  df$clock_name <- df[[clock_name]]
-  
-  df$disease_group <- interaction(df$data_pckg, df$group, sep = " ")
-  
-  stats <- get_stats(df, clock_name)
-  
-  ggplot(df, aes(x = Age, y = clock_name, color = disease_group)) +
-    geom_point(alpha = 0.7) +
-    geom_smooth(method = "lm", se = FALSE) +
-    geom_text(
-  data = stats,
-  aes(
-    x = Inf,
-    y = Inf,
-    label = label,
-    color = disease_group
-  ),
-  hjust = 1.1,
-  vjust = seq(1.2, by = 1.2, length.out = nrow(stats)),
-  show.legend = FALSE
-) +
-    scale_color_manual(values = color_map) +
-    labs(
-      title = paste(clock_name, "- Clock trajectory across all datasets"),
-      x = "Age",
-      y = clock_name,
-      color = "Disease_Group"
-    ) +
-    theme_bw() +
-    theme(
-      legend.position = "right",
-      legend.title = element_text(size = 10),
-      legend.text  = element_text(size = 8)
-    )
-}
-
-plot_scatter(clocks_data, "clockCage")
-
-lapply(clock_names, function(clock) {
-  
-  p <- plot_scatter(clocks_data, clock)
-  
-  ggsave(
-    filename = paste0("clocks_regression_", clock, ".png"),
-    plot = p,
-    width = 10,
-    height = 6,
-    dpi = 300
-  )
-})
-'''
-dev.off()
-png(
-  filename = "age_acceleration_lm_dotchart.png",
-  width = 10, height = 6, units = "in", res = 300
-)
-
-pdf("age_acceleration_lm_dotchart.pdf", width = 15/2.54, height = 15/2.54, pointsize = 8)
-
-
+# dot chart for clocks results summary
 
 sig_thresh <- 0.05
 
 sig_df  <- sig_clocks[sig_clocks$pval <= sig_thresh, ]
 nonsig_df <- sig_clocks[sig_clocks$pval > sig_thresh, ]
 
-# Disease colors
 disease_cols <- c(
   NCS    = "#60BD68",
   HGPS   = "steelblue3",
