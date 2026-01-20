@@ -453,43 +453,6 @@ disease2col <- c(
   "NCS" = "#60BD68"
 )
 
-#CONTROLS
-controls_young <- readRDS("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/almstrup_annmatrix.rds")
-controls_old <- readRDS("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/johansson_annmatrix.rds")
-controls_epic <- readRDS("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/fraga.rds")
-controls <- readRDS("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/wiegand.rds")
-controls <- readRDS("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/zhuang.rds")
-
-controls_450k <- cbind(controls_old, controls_young)
-remove(controls_old)
-remove(controls_young)
-
-controls_epic <- cbind(controls_epic, controls)
-remove(controls)
-
-n <- max(nrow(controls_450k), nrow(controls_epic))
-
-controls_450k[(nrow(controls_450k)+1):n, ] <- NA
-df2[(nrow(df2) + 1):n, ] <- NA
-
-result <- cbind(df1, df2)
-
-
-cgs <- c("cg07318983", "cg17760318", "cg10181615", "cg00212031", "cg00213748")
- 
-# Determine age and modification ranges for consistent axes
-all_ages <- unlist(lapply(datasets, function(d) d$age))
-all_vals <- unlist(lapply(datasets, function(d) {
-  cg_vals <- rownames(d)[rownames(d) %in% cgs]
-  as.vector(d[cg_vals, , drop = FALSE] * 100)
-}))
-xlim <- c(0,100)
-ylim <- c(0,100)
-
-cgs <- names(progeria_int_from_all)
-
-
-##### PROGERIA ####
 
 format_p_NCS <- function(p) {
   if (is.na(p)) return("p = NA")
@@ -523,11 +486,11 @@ ylim <- c(0,100)
 
 dev.off()
 
-cgs <- progeria_noint_top10[1:5]
-cgs <- c("cg05084282", "cg22615323", "cg22495669", "cg13054642", "cg24524750")
+# additional control datasets are in controls_epic and controls_450k
+# ncs_cpgs, progeria_cpgs, werner_cpgs are vectors with p values of top 5 cytosines and their names
 
 # Open PDF
-pdf("ncs_int_top5.pdf", width = 15/2.54, height = 4/2.54, pointsize = 8)
+pdf("cpgs_profiles.pdf", width = 15/2.54, height = 4/2.54, pointsize = 8)
 par(mfrow = c(1,5), mar = c(2,1,4,1), oma = c(3,5,1,2), tck = -0.02, mgp = c(2,0.5,0), lwd = 0.5)
 
 for(cg in cgs) {
@@ -535,30 +498,18 @@ for(cg in cgs) {
   p_ncs <- numeric(0)
   p_ws <- numeric(0)
   p_hgps <- numeric(0)
-  
-  if(cg %in% c("cg24263283","cg16619777","cg14219337","cg06476663","cg12010476","cg05084282", "cg22615323", "cg22495669", "cg16271823", "cg06648629", "cg00040047", "cg11503487", "cg03522247")) {
-    ylim_cur <- c(60, 100)
-  } else if(cg %in% c("cg10099651","cg10181615", "cg03688699", "cg13767294","cg23026246", "cg02015280","cg05578030","cg26746936","cg05666828", "cg24524750", "cg05702448", "cg15740437", "cg00662232", "cg06581978", "ch.3.1455028R", "cg23668424")) {
-    ylim_cur <- c(0, 15)
-  } else if (cg %in% c("cg21636683", "cg17931986", "cg10413224", "cg24616385", "cg08113002")) {
-    ylim_cur <- c(20, 100)
-  } else if (cg %in% c("cg12374721","cg07318983", "cg25378916","cg13054642", "cg23525360", "cg13170705", "cg08112929", "cg24782378", "cg01267532")) {
-    ylim_cur <- c(0, 25)
-  }
-  else {
 
-    all_y <- unlist(lapply(datasets, function(d) {
-      if(cg %in% rownames(d)) d[cg,]*100 else NULL
-    }))
-    ylim_cur <- c(0,100)
-    ylim_cur <- ylim_cur + c(-0.05, 0.05) * diff(ylim_cur)  # add 5% padding
-  }
-  
+  all_y <- unlist(lapply(datasets, function(d) {
+    if(cg %in% rownames(d)) d[cg,]*100 else NULL
+  }))
+  ylim_cur <- c(0,100)
+  ylim_cur <- ylim_cur + c(-0.05, 0.05) * diff(ylim_cur)
+
 
   plot(NA, xlim = xlim, ylim = ylim_cur, xlab = "", yaxt = "n",  xaxt = "n",yaxs = "i", type = "n")
   
-  if (cg %in% rownames(controls)) {
-    points(controls$age, controls[cg,] * 100, 
+  if (cg %in% rownames(controls_epic)) {
+    points(controls_epic$age, controls_epic[cg,] * 100, 
            col = adjustcolor("lightgrey", alpha.f = 0.1), 
            pch = 19, cex = 1)
   }
@@ -568,7 +519,6 @@ for(cg in cgs) {
            pch = 19, cex = 1)
   }
   
-  # --- Add points, mean line, and regression line ---
   for(disease in names(datasets)) {
     d <- datasets[[disease]]
     if(cg %in% rownames(d)) {
@@ -576,17 +526,14 @@ for(cg in cgs) {
       x_vals <- d$age
       
       if (disease != "controls"){
-      # semi-transparent, slightly jittered points
       points(x_vals + runif(length(x_vals), -0.2, 0.2), y_vals, 
              col = "black", bg =adjustcolor(disease2col[disease], alpha.f = 0.9), 
              pch = 21, cex = 1)
       
-      # soft horizontal mean line
       abline(h = mean(y_vals, na.rm = TRUE), 
              col = adjustcolor(disease2col[disease], alpha.f = 0.4), 
              lwd = 2, lty = 2)  # dashed
       
-      # regression line within data range
       if(length(x_vals) > 1) {
         fit <- lm(y_vals ~ x_vals)
         x_line <- range(x_vals, na.rm = TRUE)
@@ -596,13 +543,12 @@ for(cg in cgs) {
       }
     
     
-    # --- p-value labels ---
       if (disease == "NCS") {
-        p_ncs <<- ncs_int_top5[[cg]]
+        p_ncs <<- ncs_cpgs[[cg]]
       } else if (disease == "HGPS") {
-        p_hgps <<- progeria_int_top5[[cg]]
+        p_hgps <<- progeria_cpgs[[cg]]
       } else if (disease == "Werner") {
-       p_ws <<- werner_int_top5[[cg]]
+       p_ws <<- werner_cpgs[[cg]]
       }
       
     }
@@ -616,9 +562,6 @@ for(cg in cgs) {
     axis(1, at = x_ticks, labels = x_ticks, cex.axis = 1, lwd = 0.5, lwd.ticks = 0.5)
     title(xlab = "Age (years)", line = 1.5, font = 1, outer = TRUE)
 
-  'if(cg == cgs[18]){
-    title(xlab = "Age (years)")
-  }'
 
   }
   legend("topright",
@@ -644,26 +587,6 @@ legend(
 invisible(dev.off())
 
 
-
-# cpgs_ncs_1_classic - no interaction, classic
-# cpgs_ncs_2_classic - interaction, classic
-common_ncs_classic <- cpgs_ncs_2_classic %in% cpgs_ncs_1_classic
-# cpgs_ncs_1_all - no interaction, all cases
-# cpgs_ncs_2_all - interaction, all cases
-common_ncs_all <- cpgs_ncs_1_all %in% cpgs_ncs_2_all
-
-common_ncs_1 <- cpgs_ncs_1_classic %in% cpgs_ncs_1_all
-common_ncs_2 <- cpgs_ncs_2_classic %in% cpgs_ncs_2_all
-
-common_ncs <- intersect(intersect(intersect(cpgs_ncs_1_classic, cpgs_ncs_2_classic), cpgs_ncs_1_all), cpgs_ncs_2_all)
-
-
-plot(data_ncs$age, data_ncs["cg16742703",], col = lab2col(data_ncs$diagnosis, ref = data_ncs$diagnosis), pch=19)
-
-plot(data_progeria$age, data_progeria["cg16742703",], col = lab2col(data_progeria$diagnosis, ref = data_progeria$diagnosis), pch=19)
-
-fill = c("#60BD68", "steelblue3", "slateblue3")
-# Venn diagrams
 
 pdf("venn_noint.pdf", width = 4, height = 4, pointsize = 10)
 
