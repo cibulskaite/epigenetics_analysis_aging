@@ -44,136 +44,43 @@ userClocks <- c("calcAdaptAge", "calcDunedinPoAm38", "calcHannum", "calcHorvath2
                 "calcZhang2019", "calcEpiTOC", "calcHorvath1",  "calcPhenoAge",
                 "calcZhang",  "calcDamAge", "calcDNAmTL")
 
-clock_list <- c("Sample_ID", "gender", "Age", "group", "data_pckg", "DamAge", "AdaptAge", "CausAge", "PhenoAge",
-                "DunedinPoAm38", "Hannum", "Horvath1", "Horvath2", "Zhang",
-                "Zhang2019", "EpiTOC", "DNAmTL", "Age_prediction", "PCHorvath1", "PCHorvath2",
-                "PCHannum", "PCPhenoAge", "PCDNAmTL", "PCGrimAge", "intrinClock", "clockCage")
+clock_list <- c("Sample_ID", "gender", "Age", "group", "data_pckg", "DamAge",
+                "AdaptAge", "CausAge", "PhenoAge", "DunedinPoAm38", "Hannum",
+                "Horvath1", "Horvath2", "Zhang", "Zhang2019", "EpiTOC", "DNAmTL",
+                "Age_prediction", "PCHorvath1", "PCHorvath2", "PCHannum",
+                "PCPhenoAge", "PCDNAmTL", "PCGrimAge", "intrinClock", "clockCage")
 
-progeria_clocks <- calcUserClocks(userClocks, t(data_progeria), progeriaPheno, imputation = F)
+df_clocks <- calcUserClocks(userClocks, t(df), dfPheno, imputation = F)
 
-progeria_pcclocks <- calcPCClocks(t(as.matrix(data_progeria)), progeriaPheno)
-progeria_clocks <- merge(progeria_clocks, progeria_pcclocks)
-
-
-progeria_intrin <- data.frame(intrinClock = clock_intrinclock(data_progeria))
-progeria_intrin$Sample_ID <- rownames(progeria_intrin)
-progeria_clocks <- merge(progeria_clocks, progeria_intrin)
+df_pcclocks <- calcPCClocks(t(as.matrix(df_progeria)), dfPheno)
+df_clocks <- merge(df_clocks, df_pcclocks)
 
 
-progeria_cage <- data.frame(clockCage = clock_cage(data_progeria))
-progeria_cage$Sample_ID <- rownames(progeria_cage)
-progeria_clocks <- merge(progeria_clocks, progeria_cage)
+df_intrin <- data.frame(intrinClock = clock_intrinclock(df))
+df_intrin$Sample_ID <- rownames(df_intrin)
+df_clocks <- merge(df_clocks, df_intrin)
 
 
-progeria_systemsAge <- calcSystemsAge(t(data_progeria), progeriaPheno)
-systemsAge_cols <- c("Sample_ID", "gender", "Age", "group", "Female", "SystemsAge", "Age_prediction", "Blood")
-progeria_systemsAge <- progeria_systemsAge[,systemsAge_cols]
-progeria_clocks <- merge(progeria_clocks, progeria_systemsAge)
+df_cage <- data.frame(clockCage = clock_cage(df))
+df_cage$Sample_ID <- rownames(df_cage)
+df_clocks <- merge(df_clocks, df_cage)
 
-progeria_clocks$data_pckg <- "progeria"
-
-progeria_retro <- calcRetroClock450k(t(data_progeria), progeriaPheno)
-progeria_clocks <- merge(progeria_clocks, progeria_retro)
+df_clocks$data_pckg <- "disease_name"
 
 
-# NCS
-
-data_ncs <- readRDS("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/GSE64495_annmatrix.rds")
-
-data_ncs_classic <- data_ncs_classic[, data_ncs_classic$diagnosis %in% c("control", "syndrome x")]
-data_ncs <- data_ncs[, data_ncs$diagnosis != "down syndrome and possibly syndrome x"]
-
-data_ncs$diagnosis[data_ncs$diagnosis!="control"] <- "ncs"
-data_ncs$diagnosis[data_ncs$diagnosis=="control"] <- "control NCS"
-
-data_ncs <- data_ncs[, data_ncs$age < 30]
-
-ncsPheno <- data.frame(Sample_ID = data_ncs$id,
-                       gender = data_ncs$sex,
-                       Age = data_ncs$age,
-                       group = data_ncs$diagnosis,
-                       Female = data_ncs$sex)
-
-ncsPheno$group <- ifelse(ncsPheno$group == "control", 0, 1)
-ncsPheno$Female <- ifelse(ncsPheno$Female == "M", 0, 1)
-
-ncs_clocks <- calcUserClocks(userClocks, t(data_ncs), ncsPheno, imputation = F)
-
-ncs_pcclocks <- calcPCClocks(t(as.matrix(data_ncs)), ncsPheno)
-ncs_clocks <- merge(ncs_clocks, ncs_pcclocks)
-
-ncs_intrin <- data.frame(intrinClock = clock_intrinclock(data_ncs))
-ncs_intrin$Sample_ID <- rownames(ncs_intrin)
-ncs_clocks <- merge(ncs_clocks, ncs_intrin)
-
-ncs_cage <- data.frame(clockCage = clock_cage(data_ncs))
-ncs_cage$Sample_ID <- rownames(ncs_cage)
-ncs_clocks <- merge(ncs_clocks, ncs_cage)
+# repeat the same with all data
+# disease names:
+#df_ncs is NCS
+#df_progeria is HGPS
+#df_werner is Werner
 
 
-ncs_systemsAge <- calcSystemsAge(t(data_ncs), ncsPheno)
-ncs_systemsAge <- ncs_systemsAge[,systemsAge_cols]
-ncs_clocks <- merge(ncs_clocks, ncs_systemsAge)
-
-ncs_clocks$data_pckg <- "ncs"
-
-ncs_retro <- calcRetroClock450k(t(data_ncs), ncsPheno)
-ncs_clocks <- merge(ncs_clocks, ncs_retro)
-
-
-# WS
-
-data_werner <- readRDS("C:/Users/X/Desktop/uni/BIOIT_BAIGIAMASIS/data/GSE131752_annmatrix.rds")
-
-data_werner <- data_werner[, data_werner$diagnosis %in% c("control", "classical werner syndrome")]
-
-data_werner$diagnosis[data_werner$diagnosis!="control"] <- "werner"
-data_werner$diagnosis[data_werner$diagnosis=="control"] <- "control Werner"
-
-wsPheno <- data.frame(Sample_ID = data_werner$id,
-                      gender = data_werner$sex,
-                      Age = data_werner$age,
-                      group = data_werner$diagnosis,
-                      Female = data_werner$sex)
-
-wsPheno$group <- ifelse(wsPheno$group == "control", 0, 1)
-wsPheno$Female <- ifelse(wsPheno$Female == "M", 0, 1)
-
-ws_clocks <- calcUserClocks(userClocks, t(data_werner), wsPheno, imputation = F)
-
-
-ws_pcclocks <- calcPCClocks(t(as.matrix(data_werner)), wsPheno)
-ws_clocks <- merge(ws_clocks, ws_pcclocks)
-
-ws_intrin <- data.frame(intrinClock = clock_intrinclock(data_werner))
-ws_intrin$Sample_ID <- rownames(ws_intrin)
-ws_clocks <- merge(ws_clocks, ws_intrin)
-
-ws_cage <- data.frame(clockCage = clock_cage(data_werner)) #missing cytosines
-ws_cage$Sample_ID <- rownames(ws_cage)
-ws_clocks <- merge(ws_clocks, ws_cage)
-
-ws_systemsAge <- calcSystemsAge(t(as.matrix(data_werner)), wsPheno)
-ws_systemsAge <- ws_systemsAge[,systemsAge_cols]
-ws_clocks <- merge(ws_clocks, ws_systemsAge)
-
-ws_clocks$data_pckg <- "werner"
-
-
-# save the data
-saveRDS(progeria_clocks, file = "progeria_clocks.rds")
-saveRDS(ncs_clocks, file = "ncs_clocks.rds")
-saveRDS(ws_clocks, file = "ws_clocks.rds")
 
 # bind all
 
-clocks_data <- rbind(rbind(progeria_clocks[,1:46], ncs_clocks[,1:46]), ws_clocks)
+clocks_data <- rbind(rbind(df_progeria, df_ncs), df_werner)
 
 clocks_data$group <- ifelse(clocks_data$group == 0, "control", "disease")
-
-clocks_data$data_pckg[clocks_data$data_pckg=="ncs"] <- "NCS"
-clocks_data$data_pckg[clocks_data$data_pckg=="progeria"] <- "HGPS"
-clocks_data$data_pckg[clocks_data$data_pckg=="werner"] <- "Werner"
 
 clocks_data <- clocks_data %>%
   select(all_of(clock_list)) %>%
@@ -184,8 +91,6 @@ clocks_data <- clocks_data %>%
   rename(SystemsAge = Age_prediction) %>%
   rename(C_age = clockCage)
 
-
-saveRDS(clocks_data, file = "clocks_data.rds")
 
 clock_names <- colnames(clocks_data)[6:26]
 
